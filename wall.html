@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0F0F0F">
+<title>EF Pong — Wall</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23006BD6'/><circle cx='50' cy='50' r='24' fill='white'/></svg>">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<style>
+  body{background:#0F0F0F;overflow:hidden}
+  #wall{position:fixed;inset:0;display:flex;flex-direction:column;padding:44px 56px 40px;overflow:hidden}
+  .glow{position:absolute;top:-160px;right:-120px;width:520px;height:520px;border-radius:999px;background:radial-gradient(circle,#006BD6 0%,transparent 70%);opacity:.28}
+</style>
+</head>
+<body>
+<div id="wall">
+  <div class="glow"></div>
+  <div id="wall-header" style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:48px;height:48px;border-radius:12px;background:#006BD6;display:flex;align-items:center;justify-content:center"><i class="ph-fill ph-ping-pong" style="color:#fff;font-size:30px"></i></div>
+      <div>
+        <div style="font-size:34px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1">EF Pong</div>
+        <div style="font-size:13px;font-weight:900;letter-spacing:3px;color:#006BD6;text-transform:uppercase">Office championship &middot; <span id="season-label">&hellip;</span></div>
+      </div>
+    </div>
+    <a class="tap" href="index.html" style="text-decoration:none;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);border-radius:999px;height:44px;padding:0 18px;display:flex;align-items:center;gap:8px;color:#fff;font-size:14px;font-weight:700"><i class="ph-bold ph-device-mobile" style="font-size:18px"></i>App</a>
+  </div>
+  <div id="wall-body" style="display:flex;gap:32px;flex:1;margin-top:32px;position:relative;z-index:2;min-height:0"></div>
+</div>
+<script type="module" src="js/wall.js"></script>
+</body>
+</html>
