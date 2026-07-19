@@ -1,0 +1,29 @@
+/* EF Backpack — Base / reset
+   Minimal global defaults so consumers get sane box-sizing, body type and link colors. */
+
+*,*::before,*::after{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:var(--font-family-ef-circular);
+  font-size:18px;
+  line-height:28px;
+  font-weight:300;
+  color:var(--system-text-default);
+  background:var(--system-background-default);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* Links default to EF brand blue; hover moves to mono black (matches --components-links-in-text). */
+a{color:var(--color-brand-primary);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1.5px;transition:color .15s cubic-bezier(.4,0,.95,1)}
+a:hover{color:var(--color-mono-black-100);text-decoration-thickness:2.5px}
+
+/* Standalone / with-arrow links are mono black with no underline (EF "link with arrow" pattern). */
+
+::selection{background:var(--color-blue-lightest-100);color:var(--color-mono-black-100)}
+
+/* Range slider thumb (EF blue, white ring) — can't be set inline. */
+input[type=range]{-webkit-appearance:none;appearance:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:9999px;background:var(--color-brand-primary);border:3px solid var(--color-mono-white-100);box-shadow:0 1px 3px var(--color-mono-black-30);cursor:pointer;margin-top:-8px}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:9999px;background:var(--color-brand-primary);border:3px solid var(--color-mono-white-100);box-shadow:0 1px 3px var(--color-mono-black-30);cursor:pointer}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .dm h2{font-family:var(--font-body);font-size:24px;line-height:30px;font-weight:700;color:#191919;margin:36px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .dm h2 .num{color:#006BD6;margin-right:12px}
+    .dm h3{font-family:var(--font-body);font-size:17px;line-height:24px;font-weight:700;color:#191919;margin:22px 0 6px}
+    .dm p, .dm li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .dm li{margin-bottom:5px}
+    .dm strong{font-weight:700}
+    .dm ul, .dm ol{padding-left:22px;margin:6px 0 12px}
+    .dm code{font-family:var(--font-mono);font-size:12.5px;background:#F5F5F5;padding:1px 5px;border-radius:4px}
+    .dm .note{background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}
+    .op{width:100%;border-collapse:collapse;margin:12px 0 4px;font-family:var(--font-body)}
+    .op th{font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919;vertical-align:bottom}
+    .op td{font-size:13px;line-height:20px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,.12);vertical-align:top}
+    .op td .fn{font-family:var(--font-mono);font-size:12.5px;font-weight:700;color:#191919}
+    .verb{display:inline-block;font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#fff;border-radius:4px;padding:1px 6px}
+    .vC{background:#008928}.vR{background:#006BD6}.vU{background:#C2410C}.vD{background:#D1334A}
+    .flow{background:#191919;border-radius:14px;padding:18px 22px;margin:14px 0}
+    .flow .fl{font-family:var(--font-mono);font-size:13px;line-height:26px;color:#F5F5F5}
+    .flow .fl .n{color:#4ADE80;font-weight:700;margin-right:8px}
+    .flow .fl .hi{color:#5BB8FF;font-weight:700}
+    .flow .fl .cm{color:rgba(245,245,245,.5)}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.55)">How the app talks to it &middot; backend step 3</span>
+  </div>
+  <div slot="footer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(25,25,25,.12);font-family:var(--font-body);font-size:11px;color:rgba(25,25,25,.5)">
+    <span>EF Pong &mdash; the API and where ELO runs</span>
+    <span>Confidential &middot; Internal</span>
+  </div>
+
+  <div class="dm">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Backend walkthrough &mdash; Step 3 of 7: talking to the data</div>
+    <h1 style="font-family:var(--font-body);font-size:40px;line-height:46px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-.5px">How the app talks to it</h1>
+    <p style="font-size:18px;line-height:28px;font-weight:300;margin:0 0 8px;max-width:44em">The database is storage; it doesn't do anything on its own. The <strong>API</strong> is the fixed menu of things the app is allowed to ask for. This step defines that menu &mdash; the complete list is short &mdash; and settles the one question that guards fairness: <strong>where ELO gets calculated.</strong></p>
+
+    <h2><span class="num">1</span>What an API actually is</h2>
+    <p>An API is a <strong>menu of allowed operations</strong>. The frontend never reaches into the database directly; it can only order items off the menu: &ldquo;list the leaderboard,&rdquo; &ldquo;log this match,&rdquo; &ldquo;post this comment.&rdquo; The API takes the order, does the work against the database, and hands back the result.</p>
+    <p>Two payoffs from this one idea:</p>
+    <ul>
+      <li><strong>Safety.</strong> The database password lives only inside the API, never on a phone. A phone can only do what the menu allows &mdash; it can't wipe a table or hand itself 500 ELO.</li>
+      <li><strong>One set of rules.</strong> &ldquo;A game is to 11, win by 2,&rdquo; &ldquo;ELO is zero-sum&rdquo; &mdash; enforced once, in the API, so every phone and the wall always agree.</li>
+    </ul>
+    <div class="note"><strong>You mostly get this for free.</strong> From Step 2: Supabase auto-generates a secure API over your seven tables the moment you define them &mdash; the simple &ldquo;read this / add that&rdquo; items appear on the menu automatically. You only hand-write the <em>one</em> operation that's more than a plain read/write: logging a match (&sect;3).</p></div>
+
+    <h2><span class="num">2</span>The whole menu EF Pong needs</h2>
+    <p>Every screen in the prototype is powered by this list &mdash; and that's all of it. The <span class="verb vC">C</span><span class="verb vR">R</span><span class="verb vU">U</span><span class="verb vD">D</span> tags are the four verbs from the basics (Create / Read / Update / Delete).</p>
+    <table class="op">
+      <thead><tr><th style="width:24%">Operation</th><th style="width:12%">Verb</th><th>What it does &middot; powers</th></tr></thead>
+      <tbody>
+        <tr><td><span class="fn">getLeaderboard</span></td><td><span class="verb vR">READ</span></td><td>Standings for the active season, joined to players, sorted by ELO. &rarr; leaderboard &amp; wall.</td></tr>
+        <tr><td><span class="fn">getFeed</span></td><td><span class="verb vR">READ</span></td><td>Recent matches, newest first, with reaction counts and comments. &rarr; feed &amp; wall ticker.</td></tr>
+        <tr><td><span class="fn">getPlayer</span></td><td><span class="verb vR">READ</span></td><td>One player's standing, rating history (trend line), recent matches, head-to-head. &rarr; profile.</td></tr>
+        <tr><td><span class="fn">logMatch</span> <span style="font-size:10px;font-weight:900;color:#fff;background:#006BD6;padding:1px 7px;border-radius:999px">the special one</span></td><td><span class="verb vC">CREATE</span></td><td>The core action. Validates the score, computes ELO server-side, writes the match, updates both standings, appends rating history &mdash; all as one unit. &sect;3 &amp; &sect;4.</td></tr>
+        <tr><td><span class="fn">addReaction</span></td><td><span class="verb vC">CREATE</span></td><td>Adds a 🔥/😮/🤝 to a match. Anonymous at launch. &rarr; feed.</td></tr>
+        <tr><td><span class="fn">postComment</span></td><td><span class="verb vC">CREATE</span></td><td>Adds trash talk with the pick-your-name author. &rarr; feed.</td></tr>
+        <tr><td><span class="fn">deleteComment</span></td><td><span class="verb vD">DELETE</span></td><td>Author removes their own; admin removes anything. &rarr; moderation.</td></tr>
+        <tr><td><span class="fn">addPlayer</span></td><td><span class="verb vC">CREATE</span></td><td>Adds someone to the roster (name only). &rarr; log-a-match &amp; identity gate.</td></tr>
+        <tr><td><span class="fn">rollSeason</span> <span style="font-size:10px;font-weight:700;color:#946A00;background:#FFF3D6;padding:1px 7px;border-radius:999px">admin</span></td><td><span class="verb vU">UPDATE</span></td><td>Closes the active season (freezes champion), opens the next, resets standings to 1000. &rarr; seasons/Hall of Fame.</td></tr>
+        <tr><td><span class="fn">correctMatch</span> <span style="font-size:10px;font-weight:700;color:#946A00;background:#FFF3D6;padding:1px 7px;border-radius:999px">admin</span></td><td><span class="verb vD">DELETE</span>/<span class="verb vU">UPD</span></td><td>Voids or fixes a wrong match and recomputes affected ratings. Full detail in <strong>Step 6</strong>.</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:13px;color:rgba(25,25,25,.6)">Ten operations. Seven are plain reads/writes Supabase generates for you. Only <span class="fn" style="font-family:var(--font-mono);font-weight:700">logMatch</span>, <span class="fn" style="font-family:var(--font-mono);font-weight:700">rollSeason</span> and <span class="fn" style="font-family:var(--font-mono);font-weight:700">correctMatch</span> contain real logic you design &mdash; and they're the same shape.</p>
+
+    <h2><span class="num">3</span>Why ELO must run on the server &mdash; not the phone</h2>
+    <p>The prototype computes ELO in the browser (<code>calcDelta</code>) &mdash; correct for a demo, wrong for a shared app. Move that exact math to the API, and here's what it buys:</p>
+    <ul>
+      <li><strong>Everyone agrees.</strong> One implementation of the formula, run in one place. No chance two phones disagree about a rating.</li>
+      <li><strong>It can't be faked.</strong> A phone <em>asks</em> to log &ldquo;I beat Marco 11&ndash;0&rdquo;; the server decides the points. Nobody can hand themselves ELO by editing the app.</li>
+      <li><strong>Zero-sum stays intact.</strong> A match touches three tables (match + both standings + history). The server does them as <strong>one atomic unit</strong> &mdash; all succeed or none do &mdash; so two people logging at once can never half-apply and corrupt ratings. This is the concurrent-write problem from Step 2, solved.</li>
+    </ul>
+    <div class="note"><strong>Decision: ELO is computed server-side, inside <code>logMatch</code>.</strong> The frontend sends only the raw facts &mdash; who played, the score &mdash; and displays whatever the server returns. The prototype's <code>expected()</code> / <code>marginMult()</code> / <code>calcDelta()</code> move verbatim; the numbers don't change, only <em>where they run</em> does.</div>
+
+    <h2><span class="num">4</span>What <code>logMatch</code> does, in order</h2>
+    <p>This is the one operation worth seeing spelled out &mdash; on Supabase it's a small server-side function (a &ldquo;database function&rdquo;) the app calls by name. In plain steps:</p>
+    <div class="flow">
+      <div class="fl"><span class="n">1</span>Receive <span class="hi">winner, loser, scores</span> from the app <span class="cm">&mdash; nothing else is trusted</span></div>
+      <div class="fl"><span class="n">2</span>Validate: to 11, win by 2, two different players <span class="cm">&mdash; reject if not</span></div>
+      <div class="fl"><span class="n">3</span>Read both players' current <span class="hi">standings</span> for the active season</div>
+      <div class="fl"><span class="n">4</span>Compute <span class="hi">elo_delta</span> <span class="cm">&mdash; expected &times; margin &times; K, the prototype's math</span></div>
+      <div class="fl"><span class="n">5</span>Write the <span class="hi">match</span> row (delta frozen in, status = confirmed)</div>
+      <div class="fl"><span class="n">6</span>Update <span class="hi">standings</span>: winner +delta &amp; +1 win, loser &minus;delta &amp; +1 loss</div>
+      <div class="fl"><span class="n">7</span>Append two <span class="hi">rating_history</span> rows <span class="cm">&mdash; the audit trail</span></div>
+      <div class="fl"><span class="n">8</span>Return the result so the app shows &ldquo;+22 ELO&rdquo; <span class="cm">&mdash; all of 5&ndash;7 as one unit</span></div>
+    </div>
+    <p>Every other operation is a simpler version of this shape. Once <code>logMatch</code> makes sense, the API is done.</p>
+
+    <p style="margin-top:28px;padding-top:16px;border-top:2px solid #191919;font-size:13px;color:rgba(25,25,25,.55)">Step 3 of 7 &middot; Next: <strong>hosting &amp; cost</strong> &mdash; where the frontend and the Supabase backend each run so the office can reach them, where the prototype fits, and what it costs (near-free at this scale).</p>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

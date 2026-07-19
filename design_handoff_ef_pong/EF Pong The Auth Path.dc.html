@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .dm h2{font-family:var(--font-body);font-size:24px;line-height:30px;font-weight:700;color:#191919;margin:36px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .dm h2 .num{color:#006BD6;margin-right:12px}
+    .dm h3{font-family:var(--font-body);font-size:17px;line-height:24px;font-weight:700;color:#191919;margin:22px 0 6px}
+    .dm p, .dm li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .dm li{margin-bottom:5px}
+    .dm strong{font-weight:700}
+    .dm ul, .dm ol{padding-left:22px;margin:6px 0 12px}
+    .dm code{font-family:var(--font-mono);font-size:12.5px;background:#F5F5F5;padding:1px 5px;border-radius:4px}
+    .dm .note{background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}
+    .cmp{width:100%;border-collapse:collapse;margin:12px 0 4px;font-family:var(--font-body)}
+    .cmp th{font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919;vertical-align:bottom}
+    .cmp td{font-size:13px;line-height:20px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,.12);vertical-align:top}
+    .pick{font-size:10px;font-weight:900;letter-spacing:.5px;color:#fff;background:#008928;padding:2px 8px;border-radius:999px;vertical-align:middle}
+    .phase{display:flex;gap:16px;border:1.5px solid rgba(25,25,25,.14);border-radius:14px;padding:16px 18px;margin:12px 0}
+    .phase .pn{font-family:var(--font-mono);font-size:22px;font-weight:700;color:#fff;background:#006BD6;border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .phase .pc{flex:1}
+    .phase .ph{font-family:var(--font-body);font-size:16px;font-weight:700;color:#191919;margin:0 0 4px}
+    .phase .pt{font-family:var(--font-body);font-size:13.5px;font-weight:300;line-height:20px;color:#191919}
+    .phase .pt b{font-weight:700}
+    .phase .badge{font-size:10px;font-weight:900;letter-spacing:.5px;color:#fff;padding:2px 8px;border-radius:999px;margin-left:8px;vertical-align:middle}
+    .pin{background:#191919;border-radius:12px;padding:14px 18px;margin:14px 0;font-family:var(--font-mono);font-size:13px;line-height:22px;color:#F5F5F5}
+    .pin .hi{color:#5BB8FF;font-weight:700}
+    .pin .cm{color:rgba(245,245,245,.5)}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.55)">The auth path &middot; backend step 5</span>
+  </div>
+  <div slot="footer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(25,25,25,.12);font-family:var(--font-body);font-size:11px;color:rgba(25,25,25,.5)">
+    <span>EF Pong &mdash; from pick-your-name to EF SSO</span>
+    <span>Confidential &middot; Internal</span>
+  </div>
+
+  <div class="dm">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Backend walkthrough &mdash; Step 5 of 7: the auth path</div>
+    <h1 style="font-family:var(--font-body);font-size:40px;line-height:46px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-.5px">From &ldquo;pick your name&rdquo; to EF SSO</h1>
+    <p style="font-size:18px;line-height:28px;font-weight:300;margin:0 0 8px;max-width:44em">The PRD deferred login on purpose &mdash; ship value first, tighten trust later. This step shows the exact road from today's honour-system identity to full company sign-in, and why every stop on it is <strong>additive</strong>: the screens and the seven tables never get rebuilt, we only change <em>how we're sure who you are</em>.</p>
+
+    <h2><span class="num">1</span>The one hinge everything turns on</h2>
+    <p>&ldquo;Who are you?&rdquo; comes up in exactly three places in EF Pong: who <strong>logged</strong> a match (<code>entered_by</code>), who <strong>wrote</strong> a comment (<code>author_id</code>), and &mdash; later &mdash; who is <strong>allowed</strong> to log a match at all. All three already point at a <code>player</code> row. Login never changes <em>that</em>; it only changes how confidently we fill in that player.</p>
+    <div class="note"><strong>The slot is already cut.</strong> Back in <a href="EF Pong Data Model.dc.html">Step 1</a> the <code>player</code> table got a <code>login_identity</code> column, left empty for now. That single empty field is the entire hook for real login. Filling it in later is the whole migration &mdash; no new tables, no reshaped screens.</div>
+
+    <h2><span class="num">2</span>You get the machinery for free</h2>
+    <p>The reason this stays cheap is <a href="EF Pong Where Data Lives.dc.html">Step 2</a>: Supabase ships a full <strong>auth system</strong> in the same box as the database. Email magic-links, and enterprise SSO (SAML / OIDC), are switches you turn on &mdash; not systems you build. So the &ldquo;road&rdquo; below is mostly configuration, plus one small step of linking a signed-in person to their player row.</p>
+
+    <h2><span class="num">3</span>The three phases, made concrete</h2>
+
+    <div class="phase">
+      <div class="pn">1</div>
+      <div class="pc">
+        <div class="ph">Pick your name <span class="badge" style="background:#008928">Launch &mdash; today</span></div>
+        <div class="pt">No real login. On first open the app asks &ldquo;Who are you?&rdquo;; you tap your name from the roster and the phone <b>remembers it</b> (stored on that device). That remembered name fills in <code>entered_by</code> and comment authors. Anyone can log any match &mdash; the honour system, which is <a href="EF Pong PRD.dc.html">Option&nbsp;A</a>. <code>login_identity</code> stays empty. <b>This is exactly what the prototype already does.</b></div>
+      </div>
+    </div>
+
+    <div class="phase" style="border-color:#006BD6;background:#F0F7FF">
+      <div class="pn">2</div>
+      <div class="pc">
+        <div class="ph">Verify with a magic link <span class="badge" style="background:#006BD6">The upgrade</span></div>
+        <div class="pt">Turn on Supabase email magic-link auth. You enter your email, click the link it sends, and you're signed in &mdash; no password. On that first sign-in we write your email into your player's <code>login_identity</code>, <b>linking the account to the person</b>. Now the API can tell a real claim from a wish: it can enforce &ldquo;you may only log matches you played in,&rdquo; which unlocks <b>confirm-or-dispute (Option&nbsp;B)</b>. Pick-your-name doesn't disappear &mdash; the self-declared name simply becomes a verified one.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="pn">3</div>
+      <div class="pc">
+        <div class="ph">EF single sign-on <span class="badge" style="background:#191919">End state</span></div>
+        <div class="pt">Point Supabase's SSO at EF's company identity provider. Now people sign in with their existing EF account &mdash; zero new passwords, profiles auto-provision on first login, and because only EF accounts can get in, the app is <b>genuinely office-only</b> (this is what finally replaces &ldquo;reachable by URL&rdquo; from <a href="EF Pong Hosting And Cost.dc.html">Step 4</a>). <code>login_identity</code> now holds the verified EF id. Same slot, stronger proof.</div>
+      </div>
+    </div>
+
+    <h2><span class="num">4</span>Why none of it is a rebuild</h2>
+    <p>Line the phases up and only the middle column ever moves:</p>
+    <table class="cmp">
+      <thead><tr><th style="width:20%">Phase</th><th style="width:34%">What changes</th><th>What stays exactly the same</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1 &rarr; 2</strong></td><td>Add a sign-in screen; write <code>login_identity</code> on first sign-in; API starts checking identity on <code>logMatch</code>.</td><td>Every table, every other screen, the ELO math, the feed, pick-your-name as the fallback label.</td></tr>
+        <tr><td><strong>2 &rarr; 3</strong></td><td>Swap the magic-link provider for EF SSO in the Supabase dashboard.</td><td>The <code>login_identity</code> link, the confirm/dispute flow, all seven tables, the whole frontend.</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><strong>Decision: phase auth in, don't gate launch on it.</strong> Launch on Phase&nbsp;1 (pick-your-name, already built). Move to Phase&nbsp;2 when trust needs tightening &mdash; it's a config toggle plus the one-line link into <code>login_identity</code>. Adopt Phase&nbsp;3 (EF SSO) when you want office-only access and auto-provisioned profiles. Each step is opt-in and reversible; none touches the data model or the screens.</div>
+
+    <h2><span class="num">5</span>What to keep true at launch so the road stays open</h2>
+    <p>Nothing to build now &mdash; just don't paint over the hooks that are already there:</p>
+    <ul>
+      <li><strong>Keep attributing authorship.</strong> Every comment stores its <code>author_id</code>, every match its <code>entered_by</code> &mdash; even though it's self-declared today.</li>
+      <li><strong>Leave <code>login_identity</code> in place</strong> and empty. It's the single field Phase&nbsp;2 fills.</li>
+      <li><strong>Keep the <code>status</code> column on matches.</strong> Everything is <code>confirmed</code> now; it's what lets Phase&nbsp;2 introduce <code>pending</code>/<code>disputed</code> as pure config.</li>
+    </ul>
+    <p style="font-size:13px;color:rgba(25,25,25,.6)">All three already exist in the data model, so &ldquo;keeping them true&rdquo; costs nothing &mdash; it just means not stripping them out for looking unused at launch.</p>
+
+    <p style="margin-top:28px;padding-top:16px;border-top:2px solid #191919;font-size:13px;color:rgba(25,25,25,.55)">Step 5 of 7 &middot; Next: <strong>admin &amp; corrections</strong> &mdash; how to void or fix a wrong match and put every affected rating back the way it should be.</p>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .dm h2{font-family:var(--font-body);font-size:24px;line-height:30px;font-weight:700;color:#191919;margin:36px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .dm h2 .num{color:#006BD6;margin-right:12px}
+    .dm h3{font-family:var(--font-body);font-size:17px;line-height:24px;font-weight:700;color:#191919;margin:22px 0 6px}
+    .dm p, .dm li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .dm li{margin-bottom:5px}
+    .dm strong{font-weight:700}
+    .dm ul, .dm ol{padding-left:22px;margin:6px 0 12px}
+    .dm code{font-family:var(--font-mono);font-size:12.5px;background:#F5F5F5;padding:1px 5px;border-radius:4px}
+    .dm .note{background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}
+    .cmp{width:100%;border-collapse:collapse;margin:12px 0 4px;font-family:var(--font-body)}
+    .cmp th{font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919;vertical-align:bottom}
+    .cmp td{font-size:13px;line-height:20px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,.12);vertical-align:top}
+    .pick{font-size:10px;font-weight:900;letter-spacing:.5px;color:#fff;background:#008928;padding:2px 8px;border-radius:999px;vertical-align:middle}
+    .stack{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+    .layer{display:flex;align-items:center;gap:16px;border:1.5px solid rgba(25,25,25,.14);border-radius:14px;padding:14px 18px}
+    .layer .lb{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.5px;color:#fff;border-radius:6px;padding:4px 9px;flex-shrink:0;width:96px;text-align:center}
+    .layer .lt{font-family:var(--font-body);font-size:14px;font-weight:300;line-height:20px;color:#191919}
+    .layer .lt b{font-weight:700}
+    .opt{border:1.5px solid rgba(25,25,25,.14);border-radius:14px;padding:16px 20px;margin:12px 0}
+    .opt.win{border-color:#006BD6;background:#F0F7FF}
+    .opt h3{margin-top:0}
+    .kv{display:flex;gap:10px;font-family:var(--font-body);font-size:13.5px;font-weight:300;line-height:20px;padding:3px 0}
+    .kv b{font-weight:700;width:120px;flex-shrink:0;color:#191919}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.55)">Where the data lives &middot; backend step 2</span>
+  </div>
+  <div slot="footer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(25,25,25,.12);font-family:var(--font-body);font-size:11px;color:rgba(25,25,25,.5)">
+    <span>EF Pong &mdash; picking a database as a first-timer</span>
+    <span>Confidential &middot; Internal</span>
+  </div>
+
+  <div class="dm">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Backend walkthrough &mdash; Step 2 of 7: where the data lives</div>
+    <h1 style="font-family:var(--font-body);font-size:40px;line-height:46px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-.5px">Where the data lives</h1>
+    <p style="font-size:18px;line-height:28px;font-weight:300;margin:0 0 8px;max-width:44em">You have the seven tables (<a href="EF Pong Data Model.dc.html">Step 1</a>). Now: what real thing do they live inside, and how do you get one without becoming a database administrator? This is the highest-leverage call in the whole backend &mdash; it decides how much you have to build yourself.</p>
+
+    <h2><span class="num">1</span>The four layers you need &mdash; and who runs each</h2>
+    <p>Any app like EF Pong is really four layers stacked up. The only question that matters is <strong>which layers you run yourself vs. which a service runs for you</strong>:</p>
+    <div class="stack">
+      <div class="layer"><span class="lb" style="background:#006BD6">Frontend</span><span class="lt"><b>The app you already built.</b> Runs in each phone / the wall browser. You have this.</span></div>
+      <div class="layer"><span class="lb" style="background:#DA2381">API</span><span class="lt"><b>The rule-keeper.</b> The one program that holds the database password and enforces &ldquo;recompute ELO on save.&rdquo; (Step 3.)</span></div>
+      <div class="layer"><span class="lb" style="background:#191919">Database</span><span class="lt"><b>The storage.</b> Your seven tables, on a disk, kept safe and backed up.</span></div>
+      <div class="layer"><span class="lb" style="background:#008928">Hosting</span><span class="lt"><b>The always-on computer</b> the API and database run on, reachable from the office. (Step 4.)</span></div>
+    </div>
+    <p>You <em>could</em> assemble all four by hand. As a first-timer you shouldn't &mdash; there's a category of service that hands you the bottom three, pre-wired.</p>
+
+    <h2><span class="num">2</span>The two honest paths</h2>
+
+    <div class="opt">
+      <h3>Path A &mdash; Rent a bare database, build the API yourself</h3>
+      <p>You sign up for a hosted database (e.g. a Postgres box from Amazon RDS, or a smaller host), then write and deploy a separate API program that talks to it. Four layers, you wire three.</p>
+      <div class="kv"><b>You learn</b><span>SQL, a backend language/framework, deployment, connection security, backups.</span></div>
+      <div class="kv"><b>Good when</b><span>you have unusual needs or existing backend skill. Neither applies here yet.</span></div>
+      <div class="kv"><b>For EF Pong</b><span>Overkill. Weeks of plumbing before the first match is saved.</span></div>
+    </div>
+
+    <div class="opt win">
+      <h3>Path B &mdash; A backend-as-a-service (BaaS) <span class="pick">Decided</span></h3>
+      <p>One signup gives you the database <em>and</em> an auto-generated API over it <em>and</em> the hosting, already connected. You define your seven tables in a web dashboard; it instantly gives you secure ways to read and write them. Login, realtime updates, and file storage come in the same box &mdash; which is exactly your Steps 5 and 7.</p>
+      <div class="kv"><b>You learn</b><span>how to define tables in a dashboard, and how to call a ready-made API. That's most of it.</span></div>
+      <div class="kv"><b>Real options</b><span><b>Supabase</b> (a managed Postgres &mdash; a real SQL database, so Step 1 maps 1:1), or <b>Firebase</b> (document-style). Both have free tiers that comfortably cover 40 players.</span></div>
+      <div class="kv"><b>For EF Pong</b><span>You could have the seven tables live and saving real matches this week.</span></div>
+    </div>
+
+    <div class="note"><strong>Decision: Path B on Supabase.</strong> It's a genuine Postgres database, so everything you designed in Step 1 &mdash; tables, foreign keys, the <code>standings</code> cache &mdash; drops in exactly as drawn. It also ships the three things still ahead of us for free: an auto-generated API (Step 3), built-in login incl. email magic-link and SSO (Step 5), and live realtime updates for the wall (Step 7). One tool retires four of your seven open questions.</div>
+
+    <h2><span class="num">3</span>Why not just a shared Google Sheet or a JSON file?</h2>
+    <p>Reasonable instinct at this size &mdash; here's where each breaks:</p>
+    <table class="cmp">
+      <thead><tr><th style="width:26%">Option</th><th>Where it breaks for EF Pong</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Google Sheet</strong></td><td>No safe way to let 40 phones write at once, no server to compute ELO, no login story, no live push to the wall. Fine as a scoreboard, not as an app backend.</td></tr>
+        <tr><td><strong>A JSON file on a server</strong></td><td>Two people logging a match at the same moment can overwrite each other &mdash; and with zero-sum ELO that silently corrupts ratings. Databases exist precisely to prevent this.</td></tr>
+        <tr><td><strong>A real database (BaaS)</strong></td><td>Handles concurrent writes safely, enforces the foreign keys from Step 1, and grows with you. The right floor to start on.</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">4</span>What picking Supabase actually commits you to</h2>
+    <ul>
+      <li><strong>Cost:</strong> free tier covers ~40 players with room to spare; realistic worst case is a low monthly fee only if it gets popular. We'll confirm in Step 4 (Hosting).</li>
+      <li><strong>Lock-in:</strong> low. Because it's standard Postgres underneath, your data and schema are portable if you ever outgrow it &mdash; you're not trapped.</li>
+      <li><strong>What you do next:</strong> create a project, then recreate the seven tables from Step 1 in its table editor. That single act <em>is</em> setting up your database.</li>
+      <li><strong>What you still design with me:</strong> the exact API operations (Step 3), where ELO runs, the login path (Step 5), corrections (Step 6), and the live wall (Step 7). Supabase provides the machinery; the rules are still yours.</li>
+    </ul>
+
+    <p style="margin-top:28px;padding-top:16px;border-top:2px solid #191919;font-size:13px;color:rgba(25,25,25,.55)">Step 2 of 7 &middot; Next: <strong>how the app talks to the database</strong> &mdash; what an API is, the exact handful of operations EF Pong needs, and why ELO must be computed on the server.</p>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

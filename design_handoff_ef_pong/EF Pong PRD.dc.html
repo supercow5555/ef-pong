@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .prd h2{font-family:var(--font-body);font-size:26px;line-height:32px;font-weight:700;letter-spacing:0;color:#191919;margin:40px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .prd h2 .num{color:#006BD6;font-weight:700;margin-right:12px}
+    .prd h3{font-family:var(--font-body);font-size:18px;line-height:26px;font-weight:700;color:#191919;margin:26px 0 8px}
+    .prd h4{font-family:var(--font-body);font-size:15px;line-height:22px;font-weight:700;color:#191919;margin:18px 0 6px}
+    .prd p, .prd li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .prd li{margin-bottom:5px}
+    .prd strong{font-weight:700}
+    .prd ul, .prd ol{padding-left:22px;margin:6px 0 12px}
+    .prd table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-family:var(--font-body)}
+    .prd th{font-size:11px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919;vertical-align:bottom}
+    .prd td{font-size:14px;line-height:21px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,0.12);vertical-align:top}
+    .prd tr:last-child td{border-bottom:1px solid rgba(25,25,25,0.12)}
+    .prd code, .prd .mono{font-family:var(--font-mono);font-size:13px;background:#F5F5F5;padding:1px 5px;border-radius:4px;color:#191919}
+    .prd .lead{font-family:var(--font-body);font-size:19px;line-height:29px;font-weight:300;color:#191919}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,0.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,0.55)">Product Requirements &middot; v0.2</span>
+  </div>
+  <div slot="footer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(25,25,25,0.12);font-family:var(--font-body);font-size:11px;color:rgba(25,25,25,0.5)">
+    <span>EF Pong &mdash; Office ping pong leaderboard</span>
+    <span>Confidential &middot; Internal</span>
+  </div>
+
+  <div class="prd">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Product Requirements Document</div>
+    <h1 style="font-family:var(--font-body);font-size:46px;line-height:52px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-0.5px">EF Pong</h1>
+    <p class="lead" style="margin:0 0 20px;max-width:44em">A live, always-on leaderboard for office ping pong. Log the match you just played, watch your ELO move, settle rivalries, and talk a little trash &mdash; all on your phone and on the big screen in the office.</p>
+
+    <table style="margin-top:0">
+      <tbody>
+        <tr><td style="width:150px;font-weight:700;border-bottom:none;padding-left:0">Status</td><td style="border-bottom:none">v0.2 &mdash; key decisions locked</td></tr>
+        <tr><td style="font-weight:700;border-bottom:none;padding-left:0">Scope of this doc</td><td style="border-bottom:none">MVP (leaderboard + log a match + history) with login as a fast-follow</td></tr>
+        <tr><td style="font-weight:700;border-bottom:none;padding-left:0">Audience</td><td style="border-bottom:none">~40 players in the office</td></tr>
+        <tr><td style="font-weight:700;border-bottom:none;padding-left:0">Format</td><td style="border-bottom:none">Singles, standard games to 11. Continuous seasons that reset quarterly.</td></tr>
+        <tr><td style="font-weight:700;border-bottom:none;padding-left:0">Key decisions</td><td style="border-bottom:none">Resolved &mdash; see the decision log (&sect;13)</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">1</span>Overview &amp; vision</h2>
+    <p>Ping pong in the office has turned competitive, and there's no shared source of truth for who's actually best. Wins are forgotten, bragging rights are contested, and there's no ladder to climb. <strong>EF Pong</strong> turns every casual game into a ranked match on a leaderboard everyone can see.</p>
+    <p>After a game, one (or both) of the players enters the result &mdash; e.g. "I beat Sofia 11&ndash;4." The system updates each player's <strong>ELO rating</strong>, re-orders the leaderboard, and posts the match to a public history feed where colleagues can react and comment. There's no bracket to manage: the season is one continuous live tournament, and rankings are always up to date.</p>
+    <p>Success looks like a leaderboard that people check daily, a wall display that draws a crowd, and enough friendly rivalry that people actually want to book the table.</p>
+
+    <h2><span class="num">2</span>Goals &amp; non-goals</h2>
+    <h3>Goals</h3>
+    <ul>
+      <li><strong>Frictionless logging.</strong> Recording a match takes under 20 seconds, from a phone, right at the table.</li>
+      <li><strong>A ranking people trust.</strong> ELO that reflects real skill, rewards beating stronger players, and accounts for how decisively you won.</li>
+      <li><strong>A leaderboard worth watching.</strong> Clear ranks, ratings, records, and movement &mdash; readable on a phone and legible across the room on an office screen.</li>
+      <li><strong>Raise the stakes.</strong> Rivalries, head-to-head records, "biggest upset" moments, reactions and trash talk that make wins feel like they matter.</li>
+      <li><strong>Fresh starts.</strong> Quarterly seasons reset the ladder and enshrine each season's champion in a Hall of Fame.</li>
+    </ul>
+    <h3>Non-goals (for this version)</h3>
+    <ul>
+      <li>No tournament brackets, scheduling, or court/table booking.</li>
+      <li>No deep doubles support yet &mdash; singles is the core (doubles sketched in the Appendix).</li>
+      <li>No native mobile apps &mdash; a responsive web app covers phone + display.</li>
+      <li>No integrations with external rating bodies or public/company-wide social features beyond the office group.</li>
+    </ul>
+
+    <h2><span class="num">3</span>Success metrics</h2>
+    <table>
+      <thead><tr><th style="width:44%">Metric</th><th>Target signal it's working</th></tr></thead>
+      <tbody>
+        <tr><td>Adoption</td><td>60%+ of regular players have logged at least one match in the first month</td></tr>
+        <tr><td>Logging habit</td><td>A clear majority of games played are actually recorded (spot-check against known games)</td></tr>
+        <tr><td>Engagement</td><td>Daily views of the leaderboard; reactions/comments on the match feed</td></tr>
+        <tr><td>Trust</td><td>Low dispute rate on recorded matches (&lt;5%)</td></tr>
+        <tr><td>Stickiness</td><td>Players return across a full season; the office display is left running</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">4</span>Who it's for</h2>
+    <table>
+      <thead><tr><th style="width:20%">Persona</th><th style="width:40%">What they want</th><th>What they need from EF Pong</th></tr></thead>
+      <tbody>
+        <tr><td><strong>The Regular</strong><br><span style="color:rgba(25,25,25,0.55);font-size:13px">plays most days</span></td><td>To climb the ladder and defend their rank</td><td>Fast logging, accurate ELO, rank movement, rivalry tracking</td></tr>
+        <tr><td><strong>The Challenger</strong><br><span style="color:rgba(25,25,25,0.55);font-size:13px">occasional, ambitious</span></td><td>To score a big upset and be seen doing it</td><td>Upset highlighting, feed visibility, head-to-head history</td></tr>
+        <tr><td><strong>The Spectator</strong><br><span style="color:rgba(25,25,25,0.55);font-size:13px">watches more than plays</span></td><td>To follow the drama and stir the pot</td><td>Readable leaderboard, live feed, reactions and comments</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">5</span>Scope &mdash; what's in the MVP</h2>
+    <p>Priorities use <strong>MoSCoW</strong>: <span style="color:#008928;font-weight:700">Must</span>, <span style="color:#006BD6;font-weight:700">Should</span>, <span style="color:#FAB005;font-weight:700">Could</span>, <span style="color:rgba(25,25,25,0.5);font-weight:700">Won't (this version)</span>.</p>
+    <table>
+      <thead><tr><th style="width:58%">Capability</th><th>Priority</th></tr></thead>
+      <tbody>
+        <tr><td>Public live leaderboard (rank, ELO, W/L record)</td><td><span style="color:#008928;font-weight:700">Must</span></td></tr>
+        <tr><td>Log a singles match with score (e.g. 11&ndash;4)</td><td><span style="color:#008928;font-weight:700">Must</span></td></tr>
+        <tr><td>ELO calculation with margin-of-victory weighting</td><td><span style="color:#008928;font-weight:700">Must</span></td></tr>
+        <tr><td>Public match history feed</td><td><span style="color:#008928;font-weight:700">Must</span></td></tr>
+        <tr><td>Player profile + head-to-head vs a rival</td><td><span style="color:#006BD6;font-weight:700">Should</span></td></tr>
+        <tr><td>Quarterly seasons + Hall of Fame</td><td><span style="color:#006BD6;font-weight:700">Should</span></td></tr>
+        <tr><td>"Biggest upset / biggest mover" highlight</td><td><span style="color:#006BD6;font-weight:700">Should</span></td></tr>
+        <tr><td>Reactions &amp; comments (trash talk) on matches</td><td><span style="color:#006BD6;font-weight:700">Should</span></td></tr>
+        <tr><td>Office wall-display mode (always-on, glanceable)</td><td><span style="color:#006BD6;font-weight:700">Should</span></td></tr>
+        <tr><td>Match confirmation / dispute flow</td><td><span style="color:#FAB005;font-weight:700">Could</span></td></tr>
+        <tr><td>Login / identity verification (EF SSO)</td><td><span style="color:#FAB005;font-weight:700">Could</span> &mdash; fast-follow, see &sect;9</td></tr>
+        <tr><td>Doubles matches &amp; team ratings</td><td><span style="color:rgba(25,25,25,0.5);font-weight:700">Won't</span> &mdash; Appendix</td></tr>
+        <tr><td>Brackets, scheduling, table booking</td><td><span style="color:rgba(25,25,25,0.5);font-weight:700">Won't</span></td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">6</span>User stories</h2>
+    <ul>
+      <li>As a player, I can <strong>log a match</strong> by picking my opponent and entering the score, so the result counts toward our rankings.</li>
+      <li>As a player, I can see my <strong>current rank and ELO</strong> and how they changed after my last match.</li>
+      <li>As anyone in the office, I can open the <strong>leaderboard</strong> and instantly see who's #1 and how the top players stack up.</li>
+      <li>As a rival, I can view my <strong>head-to-head record</strong> against a specific person.</li>
+      <li>As a spectator, I can scroll the <strong>match feed</strong> and add a reaction or comment.</li>
+      <li>As a challenger, when I beat someone much higher-rated, my win is <strong>highlighted as an upset</strong>.</li>
+      <li>As a competitor, at season end I can see who's crowned champion and <strong>added to the Hall of Fame</strong>.</li>
+      <li>As an office, we can put the leaderboard on a <strong>wall screen</strong> that stays up to date on its own.</li>
+    </ul>
+
+    <h2><span class="num">7</span>Functional requirements</h2>
+
+    <h3>7.1 &nbsp;Leaderboard</h3>
+    <p>The default screen. A ranked table of all active players for the current season, sorted by ELO (highest first).</p>
+    <p>Each row shows: <strong>rank number</strong>, player name + avatar, <strong>ELO score</strong>, <strong>win/loss record</strong> (e.g. 18&ndash;7), and a <strong>movement indicator</strong> (rank change and/or ELO change since a reference point, e.g. this week). The top 3 get visual emphasis (podium treatment: gold / silver / bronze accents).</p>
+    <ul>
+      <li>Tapping a player opens their <strong>profile</strong> (&sect;7.4).</li>
+      <li>Players with fewer than the provisional-game threshold (&sect;8) are marked <span class="mono">provisional</span> and may be shown in a separate section or flagged, so an unproven 3&ndash;0 record doesn't sit above proven regulars unfairly.</li>
+      <li>Search/filter by name; a compact toggle for the wall-display mode (&sect;10).</li>
+    </ul>
+
+    <h3>7.2 &nbsp;Log a match &nbsp;<span style="font-size:12px;font-weight:700;color:#fff;background:#008928;padding:2px 8px;border-radius:999px;vertical-align:middle">Decided</span></h3>
+    <p>The core action. Flow: choose winner &rarr; choose loser (opponent) &rarr; enter the score &rarr; submit. The system infers the winner from the higher score, validates the score, computes ELO changes, and updates the leaderboard immediately.</p>
+    <h4>Match entry rules</h4>
+    <ul>
+      <li>A match is a single game to 11, win by 2 (so valid finals are 11&ndash;x where x&le;9, or deuce games like 13&ndash;11).</li>
+      <li>Both players must be distinct and selectable from the roster; adding a new player should be quick (name only).</li>
+      <li>Timestamp is captured automatically; matches appear in the feed in reverse-chronological order.</li>
+    </ul>
+    <h4>Who confirms a result? &mdash; three options to choose from</h4>
+    <p>You asked to explore this. All three assume logging is fast; they differ on how much we trust a single unverified entry. The right pick is coupled to the login decision (&sect;9).</p>
+    <table>
+      <thead><tr><th style="width:22%">Option</th><th style="width:44%">How it works</th><th>Trade-off</th></tr></thead>
+      <tbody>
+        <tr><td><strong>A. Open entry</strong></td><td>Either player logs the result; it counts immediately, no confirmation.</td><td>Lowest friction; relies fully on the honor system. Fine for a small, trusting office. Easiest to build.</td></tr>
+        <tr><td><strong>B. Confirm-or-dispute</strong> <span style="font-size:11px;font-weight:700;color:#006BD6">&larr; the target, post-login</span></td><td>The person logging picks the opponent; the opponent gets a quick "confirm / dispute" prompt. Auto-confirms after a set window (e.g. 24h) so nothing gets stuck.</td><td>Small friction, big trust gain. Catches typos and fake results. Requires a way to notify/identify the opponent.</td></tr>
+        <tr><td><strong>C. Both agree</strong></td><td>Both players must be present/logged in and both tap confirm before it counts.</td><td>Highest trust, highest friction &mdash; can stall if one player walks off. Best only if disputes become a real problem.</td></tr>
+      </tbody>
+    </table>
+    <p style="background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:8px 0 0"><strong>Decision:</strong> launch with <strong>Option A</strong> (open entry, no login), and move to <strong>Option B</strong> once login is in place. To make that a clean upgrade rather than a rebuild, the data model already gives every match a <span class="mono">status</span> field (<span class="mono">confirmed / pending / disputed</span>) &mdash; in Option A everything is simply <span class="mono">confirmed</span> on entry.</p>
+
+    <h3>7.3 &nbsp;Match history feed &amp; trash talk</h3>
+    <p>A public, reverse-chronological feed of every recorded match. Each entry shows the two players, the score, the winner, each player's ELO change (e.g. <span style="color:#008928;font-weight:700">+22</span> / <span style="color:#D1334A;font-weight:700">&minus;22</span>), the time, and any "upset" badge (&sect;7.6).</p>
+    <p style="background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:8px 0"><strong>Before login exists</strong> (Phase 1, &sect;9), the social layer still works &mdash; it just needs a name to attach to a comment:</p>
+    <ul style="margin-top:4px">
+      <li><strong>Reactions are anonymous.</strong> One-tap reactions only need a count (&ldquo;12 🔥&rdquo;), so they work with no identity at all. We don't stop repeat taps or show who reacted &mdash; fine for a fun office tool.</li>
+      <li><strong>Comments use &ldquo;pick-your-name&rdquo;.</strong> On first open, the app asks &ldquo;Who are you?&rdquo; and the person taps their name from the roster; it's remembered on that device and attributed to every comment they post. It's the honour system (someone could pick a name that isn't theirs), which is acceptable at our scale and upgrades cleanly &mdash; the data model already stores an author per comment, so Phase 2 login simply replaces the self-declared name with a verified one.</li>
+    </ul>
+    <ul>
+      <li><strong>Reactions:</strong> one-tap emoji-style reactions on any match (the crowd's response &mdash; 🔥, 😮, 🤝, etc.).</li>
+      <li><strong>Comments:</strong> a short threaded comment section per match for trash talk and banter.</li>
+      <li><strong>Light moderation:</strong> authors can delete their own comments, and a <strong>single admin</strong> (the product owner) can remove anything if it goes too far. Keep it civil-ish, but this is the stakes engine &mdash; don't over-police.</li>
+    </ul>
+
+    <h3>7.4 &nbsp;Player profile &amp; head-to-head</h3>
+    <p>Per player: current rank, ELO (with a small trend line over the season), W/L record, current streak, recent matches, and biggest wins.</p>
+    <ul>
+      <li><strong>Head-to-head:</strong> pick any other player to see the lifetime record between you (e.g. "You lead Marco 6&ndash;4"), plus your last few meetings. This is the rivalry surface.</li>
+      <li><strong>Rival highlight:</strong> optionally surface a player's closest/most-played rival on their profile.</li>
+    </ul>
+
+    <h3>7.5 &nbsp;Seasons &amp; Hall of Fame</h3>
+    <ul>
+      <li>The ladder runs in <strong>quarterly seasons</strong>. At season end, standings are frozen and the <strong>champion</strong> (and podium) are recorded.</li>
+      <li><strong>Hard reset (decided):</strong> at the start of each season, every player's rating returns to <span class="mono">1000</span> and the provisional period (&sect;8) begins again. Simple, clean, and gives everyone a genuine fresh shot at the top. Past seasons live on in the Hall of Fame. (A softer reset could be revisited later if the ladder feels too "reset-happy".)</li>
+      <li>A <strong>Hall of Fame</strong> page lists past season champions and notable records (highest peak ELO, longest streak, biggest single upset).</li>
+    </ul>
+
+    <h3>7.6 &nbsp;Biggest upset &amp; biggest mover</h3>
+    <ul>
+      <li>An <strong>upset</strong> is a win by a lower-rated player over a much higher-rated one (threshold by rating gap, e.g. 150+ points). Upset wins get a badge in the feed and can headline the leaderboard/display.</li>
+      <li><strong>Biggest mover</strong> highlights the player who gained the most ELO in a period (day/week) &mdash; a reason for spectators to check back.</li>
+    </ul>
+
+    <h2><span class="num">8</span>Ranking system (ELO)</h2>
+    <p>Ratings use a standard ELO model, adapted so that <strong>the margin of victory matters</strong> (per your call) &mdash; an 11&ndash;9 nail-biter should move the needle less than an 11&ndash;1 blowout.</p>
+    <h4>Core formula</h4>
+    <p>Every player starts at <span class="mono">1000</span>. For a match between A and B, A's <em>expected</em> result is:</p>
+    <p style="text-align:center;font-family:var(--font-mono);font-size:15px;background:#F5F5F5;padding:12px;border-radius:8px">E<sub>A</sub> = 1 / (1 + 10<sup>((R<sub>B</sub> &minus; R<sub>A</sub>) / 400)</sup>)</p>
+    <p>After the match, A's rating changes by:</p>
+    <p style="text-align:center;font-family:var(--font-mono);font-size:15px;background:#F5F5F5;padding:12px;border-radius:8px">&Delta;R<sub>A</sub> = K &times; M &times; (S<sub>A</sub> &minus; E<sub>A</sub>)</p>
+    <p>where <span class="mono">S<sub>A</sub></span> = 1 if A won, 0 if A lost. B changes by the exact opposite (<span class="mono">&Delta;R<sub>B</sub> = &minus;&Delta;R<sub>A</sub></span>), so ratings are zero-sum &mdash; points are only ever transferred, never created.</p>
+    <table>
+      <thead><tr><th style="width:26%">Parameter</th><th style="width:20%">Proposed value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Starting rating</td><td><span class="mono">1000</span></td><td>Everyone begins equal</td></tr>
+        <tr><td>K (base)</td><td><span class="mono">24</span></td><td>How fast ratings move. Higher = more volatile</td></tr>
+        <tr><td>K (provisional)</td><td><span class="mono">40</span> for first 5 games</td><td>New players calibrate faster, then settle</td></tr>
+        <tr><td>Margin multiplier M</td><td><span class="mono">1 + ln(diff) / ln(11)</span></td><td>diff = winner points &minus; loser points. Ranges 1.0 (win by 1) &rarr; 2.0 (11&ndash;0)</td></tr>
+      </tbody>
+    </table>
+    <h4>Worked example</h4>
+    <p>A (1000) beats B (1000) by <strong>11&ndash;4</strong> (diff = 7).</p>
+    <ul>
+      <li>Expected: E<sub>A</sub> = 1 / (1 + 10<sup>0</sup>) = <strong>0.50</strong> (evenly matched).</li>
+      <li>Margin: M = 1 + ln(7)/ln(11) = <strong>1.81</strong>.</li>
+      <li>Change: &Delta;R<sub>A</sub> = 24 &times; 1.81 &times; (1 &minus; 0.50) &asymp; <strong style="color:#008928">+22</strong>. So A &rarr; 1022, B &rarr; 978.</li>
+    </ul>
+    <p>Beating a <em>much stronger</em> player yields a bigger jump (upset); losing to a much weaker one costs more. All the constants above are <strong>tunable</strong> &mdash; we can calibrate K and the margin curve after a few weeks of real games. <strong>This math runs on the server</strong>, inside the <span class="mono">logMatch</span> operation, so every client agrees and no result can be faked (see <a href="EF Pong Talking To It.dc.html">Talking To It</a>, &sect;3).</p>
+    <h4>Edge cases &amp; rules to decide</h4>
+    <ul>
+      <li>Deuce games (e.g. 13&ndash;11) always have diff = 2 &rarr; M &asymp; 1.29. Reasonable.</li>
+      <li>Best-of-N (playing 3 or 5 games) is <strong>out of the launch</strong> &mdash; single games only. Parked in the backlog; if people start playing full matches, we'll add a match mode later.</li>
+      <li>Rating floor (never drop below, say, 100)? Recommended to avoid runaway losses.</li>
+      <li>Inactivity: do stale ratings decay or freeze between seasons? (See &sect;7.5 reset.)</li>
+    </ul>
+
+    <h2><span class="num">9</span>Identity &amp; login</h2>
+    <p>You flagged login as <strong>nice-to-have, not a v1 blocker</strong>. The plan phases it in so we ship value fast, then tighten trust:</p>
+    <table>
+      <thead><tr><th style="width:16%">Phase</th><th style="width:34%">Identity model</th><th>What it enables</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1 &mdash; Launch</strong></td><td>No login. Players are names on a shared roster; a device-remembered &ldquo;pick-your-name&rdquo; step (&sect;7.3) attributes comments.</td><td>Anyone can log any match (confirmation Option A). Reactions anonymous, comments self-attributed. Fastest to build and adopt.</td></tr>
+        <tr><td><strong>2 &mdash; Verify</strong></td><td>Lightweight sign-in (e.g. email magic link).</td><td>A logged-in person can only enter matches involving themselves; unlocks confirm/dispute (Option B).</td></tr>
+        <tr><td><strong>3 &mdash; SSO</strong></td><td><strong>EF single sign-on</strong> (company identity).</td><td>Zero passwords, auto-provisioned profiles, office-only access. The end-state.</td></tr>
+      </tbody>
+    </table>
+    <p>Even in Phase 1, capture enough in the data model (a player identity, a match author, a match status) that Phases 2&ndash;3 are additive, not a rebuild.</p>
+
+    <h2><span class="num">10</span>Platforms &amp; surfaces</h2>
+    <ul>
+      <li><strong>Phone (primary input):</strong> a responsive web app optimized for logging a match in seconds right at the table. Large tap targets (&ge;44px), minimal typing.</li>
+      <li><strong>Office wall display (primary output):</strong> an always-on, glanceable leaderboard mode &mdash; big type, top players, live match ticker, current champion, biggest mover. Auto-refreshes; readable across the room; no interaction required.</li>
+      <li><strong>Desktop:</strong> the same web app, comfortable for browsing profiles and history.</li>
+    </ul>
+    <p>One responsive codebase serves all three; the display is a dedicated full-screen "kiosk" view of the same data.</p>
+
+    <h2><span class="num">11</span>Data model &mdash; in plain terms</h2>
+    <p style="background:#F5F5F5;padding:12px 16px;border-radius:8px">New to databases? Think of a database as a set of <strong>spreadsheets ("tables")</strong>. Each table has columns (the fields) and rows (one record each). Tables link by referencing each other's IDs &mdash; a match "points at" the two players in it. That's the whole idea. We'll go deeper together in the architecture discussion; this is just what we need to store.</p>
+    <table>
+      <thead><tr><th style="width:22%">Table</th><th>What each row holds</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Player</strong></td><td>id, name, avatar, join date, (later) linked login identity</td></tr>
+        <tr><td><strong>Standings</strong></td><td>id, player (&rarr;Player), season (&rarr;Season), current ELO, wins, losses, peak &mdash; one row per player <em>per season</em>; the leaderboard, cached. Added to handle the quarterly reset cleanly (past seasons stay frozen = Hall of Fame)</td></tr>
+        <tr><td><strong>Match</strong></td><td>id, winner (&rarr;Player), loser (&rarr;Player), winner score, loser score, ELO change, timestamp, season, entered-by, <span class="mono">status</span> (confirmed/pending/disputed)</td></tr>
+        <tr><td><strong>RatingHistory</strong></td><td>id, player (&rarr;Player), match (&rarr;Match), rating after, timestamp &mdash; powers the trend line and "biggest mover"</td></tr>
+        <tr><td><strong>Season</strong></td><td>id, name, start date, end date, champion (&rarr;Player), active flag</td></tr>
+        <tr><td><strong>Reaction</strong></td><td>id, match (&rarr;Match), player (&rarr;Player), type &mdash; the one-tap responses</td></tr>
+        <tr><td><strong>Comment</strong></td><td>id, match (&rarr;Match), author (&rarr;Player), text, timestamp &mdash; the trash talk</td></tr>
+      </tbody>
+    </table>
+    <p>The <strong>Standings</strong> table is the one deliberately-cached exception &mdash; a fast copy of each player's current ELO/record for the leaderboard, rebuildable from matches. Everything else (rank order, head-to-head, upsets) is <em>computed</em> from these tables and never stored. See <strong><a href="EF Pong Data Model.dc.html">EF Pong Data Model</a></strong> for every column, type, and relationship drawn out.</p>
+
+    <h2><span class="num">12</span>Non-functional requirements</h2>
+    <ul>
+      <li><strong>Speed:</strong> leaderboard and feed load in about a second; the display refreshes without a visible reload.</li>
+      <li><strong>Correctness:</strong> ELO is computed deterministically and consistently; a match can be corrected/voided by an admin with ratings recalculated.</li>
+      <li><strong>Availability:</strong> it's an office toy, but the wall display should stay up for days unattended.</li>
+      <li><strong>Access:</strong> office-only. In Phase 1, obscurity + trust; from Phase 2, gated by login.</li>
+      <li><strong>Privacy:</strong> only office colleagues; no public exposure of names/records outside the group.</li>
+      <li><strong>Data integrity:</strong> nothing is silently lost; disputes and corrections are auditable.</li>
+    </ul>
+
+    <h2><span class="num">13</span>Decision log</h2>
+    <p>Resolved for this version. Each is a deliberate "keep it simple to start" call &mdash; several can be revisited once the app is live and we've watched real games.</p>
+    <table>
+      <thead><tr><th style="width:24%">Topic</th><th style="width:38%">Decision</th><th>Rationale / revisit</th></tr></thead>
+      <tbody>
+        <tr><td>Confirmation model</td><td><strong>Option A at launch</strong>, move to Option B after login (&sect;7.2)</td><td>Honor system first; tighten trust once identity exists</td></tr>
+        <tr><td>Season reset</td><td><strong>Hard reset to 1000</strong> each season (&sect;7.5)</td><td>Simplest; fresh shot for everyone. Revisit if too swingy</td></tr>
+        <tr><td>ELO constants</td><td><strong>Approved</strong> &mdash; K=24, margin curve as specced (&sect;8)</td><td>Recalibrate after a few weeks of real data</td></tr>
+        <tr><td>ELO computation</td><td><strong>Server-side</strong>, inside the <span class="mono">logMatch</span> API operation &mdash; the prototype's <span class="mono">calcDelta</span> math moves verbatim (see <a href="EF Pong Talking To It.dc.html">Talking To It</a>)</td><td>One implementation everyone agrees on; un-fakeable; keeps zero-sum atomic</td></tr>
+        <tr><td>Best-of-N matches</td><td><strong>Not in launch</strong> &mdash; single games only (&sect;8)</td><td>Backlog; add a match mode later if needed</td></tr>
+        <tr><td>Login / SSO</td><td><strong>Deferred</strong> &mdash; launch open, decide login later (&sect;9)</td><td>Not a blocker; unlocks Option B when it lands</td></tr>
+        <tr><td>Moderation</td><td><strong>Single admin</strong> (the product owner) can delete comments (&sect;7.3)</td><td>Light touch; expand roles only if needed</td></tr>
+        <tr><td>Data model</td><td><strong>Seven tables</strong> incl. a <span class="mono">standings</span> cache (per player&times;season) &mdash; see <a href="EF Pong Data Model.dc.html">Data Model</a></td><td>Clean seasonal reset + Hall of Fame; additive, frontend unaffected</td></tr>
+        <tr><td>Backend platform</td><td><strong>Supabase</strong> (managed Postgres BaaS) &mdash; see <a href="EF Pong Where Data Lives.dc.html">Where Data Lives</a></td><td>Real SQL so the data model maps 1:1; bundles API, auth/SSO &amp; realtime; free at this scale</td></tr>
+        <tr><td>Hosting</td><td><strong>Frontend on GitHub Pages</strong> (free static host), backend on Supabase &mdash; see <a href="EF Pong Hosting And Cost.dc.html">Hosting &amp; Cost</a></td><td>Static app runs in the browser and calls Supabase directly; code already on GitHub, so fewest moving parts; ~free at 40 players</td></tr>
+        <tr><td>Corrections</td><td><strong>Void/edit a match, then full-season replay</strong> (the <code>correctMatch</code> op) &mdash; see <a href="EF Pong Admin And Corrections.dc.html">Admin &amp; Corrections</a></td><td>Deterministic &amp; atomic; admin-only; voids are marked not deleted, so history stays auditable</td></tr>
+        <tr><td>Live wall</td><td><strong>Supabase realtime</strong>, polling as fallback &mdash; see <a href="EF Pong The Live Wall.dc.html">The Live Wall</a></td><td>Included in Supabase; instant updates; auto-reconnect + refetch-on-wake for days-long unattended runs</td></tr>
+        <tr><td>Doubles</td><td><strong>Not now</strong> &mdash; revisit well after login (Appendix)</td><td>No current appetite; keep singles scoring clean</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">14</span>Suggested phasing</h2>
+    <table>
+      <thead><tr><th style="width:18%">Release</th><th style="width:42%">Ships</th><th>Goal</th></tr></thead>
+      <tbody>
+        <tr><td><strong>MVP</strong></td><td>Leaderboard, log a match (Option A), ELO with margin, public feed, basic profiles</td><td>Get real games flowing and the ladder live</td></tr>
+        <tr><td><strong>v1.1</strong></td><td>Reactions + comments, head-to-head, upset/mover badges, wall-display mode</td><td>Turn up the stakes and the crowd</td></tr>
+        <tr><td><strong>v1.2</strong></td><td>Quarterly seasons (hard reset) + Hall of Fame, single-admin moderation</td><td>Long-term competition and fresh starts</td></tr>
+        <tr><td><strong>Later</strong></td><td>Login &rarr; confirm/dispute (Option B) &rarr; EF SSO; then doubles, records &amp; achievements</td><td>Trust, then depth</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">15</span>Appendix &mdash; future ideas</h2>
+    <ul>
+      <li><strong>Doubles:</strong> log 2v2 games. Simplest approach: treat a team's rating as the average of its two players, distribute the ELO change to each. Keep a separate doubles rating so it doesn't muddy singles. (Deliberately deferred to keep MVP scoring clean.)</li>
+      <li><strong>Achievements &amp; titles:</strong> "Giant Slayer", "On Fire" (win streaks), "Nemesis" (owns a specific rival).</li>
+      <li><strong>Rivalry pages &amp; taunts:</strong> challenge someone; pre-match trash talk.</li>
+      <li><strong>Notifications:</strong> "You've been overtaken", "Your record was just logged", weekly recap.</li>
+      <li><strong>Stats:</strong> peak ELO, favorite/nightmare opponents, time-of-day performance.</li>
+    </ul>
+
+    <p style="margin-top:36px;padding-top:16px;border-top:2px solid #191919;font-size:13px;color:rgba(25,25,25,0.55)">End of document &middot; EF Pong PRD v0.2 &middot; Key decisions locked (&sect;13). Next: build the frontend prototype, then walk through the backend/database together.</p>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

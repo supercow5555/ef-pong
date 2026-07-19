@@ -1,0 +1,58 @@
+/* EF Backpack — Typography scale
+   Derived from the 𝕿 Typography Figma Variable collection. The raw size/line-height
+   tokens are unitless (px-intended); these classes express the full ramp in real px.
+   Family = EF Circular (substituted by Figtree). Desktop scale; mobile variants noted. */
+
+:root {
+  --font-mono: var(--font-family-mono);
+  --font-body: var(--font-family-ef-circular);
+}
+
+/* ---- Display (marketing hero) ---- */
+.ef-display-1{font-family:var(--font-body);font-size:72px;line-height:80px;font-weight:700;letter-spacing:0}
+.ef-display-2{font-family:var(--font-body);font-size:64px;line-height:72px;font-weight:700;letter-spacing:0}
+.ef-display-caps{font-family:var(--font-body);font-size:80px;line-height:84px;font-weight:900;letter-spacing:4px;text-transform:uppercase}
+
+/* ---- Headers ---- */
+.ef-h1{font-family:var(--font-body);font-size:56px;line-height:64px;font-weight:700;letter-spacing:0}
+.ef-h2{font-family:var(--font-body);font-size:48px;line-height:56px;font-weight:700;letter-spacing:0}
+.ef-h3{font-family:var(--font-body);font-size:40px;line-height:48px;font-weight:700;letter-spacing:0}
+.ef-h4{font-family:var(--font-body);font-size:32px;line-height:40px;font-weight:700;letter-spacing:0}
+.ef-h5{font-family:var(--font-body);font-size:24px;line-height:32px;font-weight:700;letter-spacing:0}
+.ef-h6{font-family:var(--font-body);font-size:16px;line-height:24px;font-weight:700;letter-spacing:0}
+
+/* ---- Subheaders (light intro copy under a header) ---- */
+.ef-subheader-1{font-family:var(--font-body);font-size:32px;line-height:40px;font-weight:400;letter-spacing:0}
+.ef-subheader-2{font-family:var(--font-body);font-size:24px;line-height:32px;font-weight:400;letter-spacing:0}
+
+/* ---- Titles (component/UI headings, medium weight) ---- */
+.ef-title-1{font-family:var(--font-body);font-size:24px;line-height:32px;font-weight:500;letter-spacing:0}
+.ef-title-2{font-family:var(--font-body);font-size:20px;line-height:28px;font-weight:500;letter-spacing:0}
+.ef-title-3{font-family:var(--font-body);font-size:18px;line-height:28px;font-weight:500;letter-spacing:0}
+
+/* ---- Body ---- */
+.ef-body{font-family:var(--font-body);font-size:18px;line-height:28px;font-weight:300;letter-spacing:0}
+.ef-body-book{font-family:var(--font-body);font-size:18px;line-height:28px;font-weight:400;letter-spacing:0}
+.ef-body-small{font-family:var(--font-body);font-size:16px;line-height:24px;font-weight:400;letter-spacing:0}
+
+/* ---- Eyebrow (all-caps kicker) ---- */
+.ef-eyebrow{font-family:var(--font-body);font-size:14px;line-height:16px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase}
+.ef-eyebrow-large{font-family:var(--font-body);font-size:18px;line-height:24px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase}
+
+/* ---- UI labels (buttons, form labels, chips) ---- */
+.ef-ui-label{font-family:var(--font-body);font-size:16px;line-height:24px;font-weight:400;letter-spacing:0}
+.ef-ui-label-bold{font-family:var(--font-body);font-size:16px;line-height:24px;font-weight:700;letter-spacing:0}
+.ef-ui-label-large{font-family:var(--font-body);font-size:18px;line-height:24px;font-weight:400;letter-spacing:0}
+.ef-ui-label-large-bold{font-family:var(--font-body);font-size:18px;line-height:24px;font-weight:700;letter-spacing:0}
+.ef-ui-label-small{font-family:var(--font-body);font-size:14px;line-height:20px;font-weight:400;letter-spacing:0}
+.ef-ui-label-small-bold{font-family:var(--font-body);font-size:14px;line-height:20px;font-weight:700;letter-spacing:0}
+
+/* ---- Small print / captions ---- */
+.ef-small-print{font-family:var(--font-body);font-size:12px;line-height:16px;font-weight:400;letter-spacing:0}
+.ef-small-print-bold{font-family:var(--font-body);font-size:12px;line-height:16px;font-weight:700;letter-spacing:0}
+
+/* ---- In-text link ---- */
+.ef-in-text-link{font-family:var(--font-body);font-size:18px;line-height:28px;font-weight:400;color:var(--color-brand-primary);text-decoration:underline;text-underline-offset:2px}
+
+/* ---- Mono (code, timers, data) ---- */
+.ef-mono{font-family:var(--font-mono);font-size:16px;line-height:24px;font-weight:400;letter-spacing:0}

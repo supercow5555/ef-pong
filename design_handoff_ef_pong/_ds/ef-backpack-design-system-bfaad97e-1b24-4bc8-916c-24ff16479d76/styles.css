@@ -1,0 +1,18 @@
+/* ============================================================
+   EF Backpack Design System — global CSS entry point.
+   Consumers link THIS file only. It is an @import manifest;
+   all real declarations live in the imported files.
+   ============================================================ */
+
+/* Design tokens: colors, spacing, radii, typography vars, all theme modes
+   (default / light / dark / mono) — generated from Figma Variables. */
+@import './tokens/fig-tokens.css';
+
+/* Font faces + family/weight overrides (EF Circular → Figtree substitute). */
+@import './tokens/fonts.css';
+
+/* Typography ramp as utility classes (.ef-display-1, .ef-h1, .ef-body …). */
+@import './tokens/typography.css';
+
+/* Base reset, body defaults, link colors. */
+@import './tokens/base.css';

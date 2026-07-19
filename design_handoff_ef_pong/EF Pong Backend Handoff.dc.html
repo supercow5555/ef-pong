@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <script src="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/_ds_bundle.js"></script>
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .hd h2{font-family:var(--font-body);font-size:24px;line-height:30px;font-weight:700;color:#191919;margin:36px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .hd h2 .num{color:#006BD6;margin-right:12px}
+    .hd h3{font-family:var(--font-body);font-size:17px;line-height:24px;font-weight:700;color:#191919;margin:22px 0 6px}
+    .hd p, .hd li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .hd li{margin-bottom:5px}
+    .hd strong{font-weight:700}
+    .hd ul, .hd ol{padding-left:22px;margin:6px 0 12px}
+    .hd table{width:100%;border-collapse:collapse;margin:10px 0 16px}
+    .hd th{font-size:11px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919}
+    .hd td{font-size:14px;line-height:21px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,.12);vertical-align:top}
+    .hd code{font-family:var(--font-mono);font-size:13px;background:#F5F5F5;padding:1px 5px;border-radius:4px}
+    .hd .paste{font-family:var(--font-mono);font-size:13px;line-height:21px;background:#191919;color:#F5F5F5;border-radius:12px;padding:18px 20px;white-space:pre-wrap;text-wrap:wrap}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.55)">Backend handoff brief</span>
+  </div>
+
+  <div class="hd">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Handoff Brief &mdash; read this to pick up in a new session</div>
+    <h1 style="font-family:var(--font-body);font-size:40px;line-height:46px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-.5px">EF Pong &mdash; backend &amp; database walkthrough</h1>
+    <p style="font-size:18px;line-height:28px;font-weight:300;margin:0 0 8px;max-width:44em">This brief tracks the backend walkthrough for EF Pong. It summarises what the product is, what's already built, every decision we've locked (all 7 steps done), the data we store, and &mdash; now that design is complete &mdash; <strong>how to hand this to Claude Code and what to build next</strong>.</p>
+
+    <h2><span class="num">1</span>What EF Pong is</h2>
+    <p>A live, always-on leaderboard for office ping pong (~40 players at EF). After a game, a player logs the result (e.g. &ldquo;I beat Sofia 11&ndash;4&rdquo;); the app updates each player's <strong>ELO rating</strong>, re-ranks the ladder, and posts the match to a public feed where colleagues react and talk trash. Quarterly seasons reset the ladder; past champions live in a Hall of Fame. Used on phones (to log) and on an office wall display (to watch).</p>
+
+    <h2><span class="num">2</span>What already exists (in this project)</h2>
+    <p style="margin-bottom:4px"><strong>Product &amp; prototype:</strong></p>
+    <ul>
+      <li><strong><a href="EF Pong PRD.dc.html">EF Pong PRD.dc.html</a></strong> &mdash; the full product requirements (v0.2, decisions locked; kept as source of truth).</li>
+      <li><strong><a href="EF Pong Prototype.dc.html">EF Pong Prototype.dc.html</a></strong> &mdash; a working, clickable <em>frontend</em> prototype: leaderboard, log-a-match with live ELO, feed with reactions + comments, profile + head-to-head, wall display, and a &ldquo;pick-your-name&rdquo; identity gate. It uses seeded in-memory data &mdash; <strong>nothing is saved; there is no backend yet.</strong> The <em>design</em> is done; making it deployable and wiring it to the backend is build work still ahead.</li>
+    </ul>
+    <p style="margin-bottom:4px"><strong>Backend design (this walkthrough, in order):</strong></p>
+    <ul>
+      <li><strong><a href="EF Pong Data Model.dc.html">EF Pong Data Model.dc.html</a></strong> &mdash; Step 1: the seven tables drawn concretely (columns, types, keys, relationships).</li>
+      <li><strong><a href="EF Pong Where Data Lives.dc.html">EF Pong Where Data Lives.dc.html</a></strong> &mdash; Step 2: the database platform decision (Supabase).</li>
+      <li><strong><a href="EF Pong Talking To It.dc.html">EF Pong Talking To It.dc.html</a></strong> &mdash; Step 3: the API operations and server-side ELO.</li>
+      <li><strong><a href="EF Pong Hosting And Cost.dc.html">EF Pong Hosting And Cost.dc.html</a></strong> &mdash; Step 4: where the frontend and backend run, and the cost.</li>
+      <li><strong><a href="EF Pong The Auth Path.dc.html">EF Pong The Auth Path.dc.html</a></strong> &mdash; Step 5: the login road &mdash; pick-your-name &rarr; magic link &rarr; EF SSO.</li>
+      <li><strong><a href="EF Pong Admin And Corrections.dc.html">EF Pong Admin And Corrections.dc.html</a></strong> &mdash; Step 6: voiding/fixing a wrong match and recomputing ratings (<code>correctMatch</code>).</li>
+      <li><strong><a href="EF Pong The Live Wall.dc.html">EF Pong The Live Wall.dc.html</a></strong> &mdash; Step 7: keeping the office display live (Supabase realtime, polling fallback).</li>
+    </ul>
+    <p>Everything is built on the <strong>EF Backpack design system</strong> bound to this project. Keep using it for any new UI.</p>
+
+    <h2><span class="num">3</span>Decisions already locked</h2>
+    <table>
+      <thead><tr><th style="width:34%">Topic</th><th>Decision</th></tr></thead>
+      <tbody>
+        <tr><td>Match confirmation</td><td>Launch open (anyone can log any match, counts immediately); move to confirm-or-dispute after login</td></tr>
+        <tr><td>Identity at launch</td><td>No real login. &ldquo;Pick-your-name&rdquo; remembered on device; reactions anonymous, comments self-attributed. EF SSO deferred to later.</td></tr>
+        <tr><td>ELO</td><td>Start 1000; K=24 (40 for first 5 provisional games); margin-of-victory multiplier <code>M = 1 + ln(pointDiff)/ln(11)</code>; zero-sum; rating floor ~100</td></tr>
+        <tr><td>Seasons</td><td>Quarterly, <strong>hard reset</strong> to 1000; past seasons kept for Hall of Fame</td></tr>
+        <tr><td>Scope out of launch</td><td>Best-of-N matches, doubles, EF SSO &mdash; all backlog</td></tr>
+        <tr><td>Moderation</td><td>Single admin (the product owner) can delete comments</td></tr>
+        <tr><td>Data model</td><td><strong>Seven tables</strong> &mdash; the PRD's six plus a <code>standings</code> cache (one row per player&times;season). Clean seasonal reset + Hall of Fame; additive, frontend unaffected. See Data Model.</td></tr>
+        <tr><td>Backend platform</td><td><strong>Supabase</strong> (managed Postgres backend-as-a-service). Real SQL so the data model maps 1:1; bundles the API, auth/SSO and realtime; free at this scale. Frontend hosts separately (Step 4). See Where Data Lives.</td></tr>
+        <tr><td>ELO computation</td><td><strong>Server-side</strong>, inside the <code>logMatch</code> operation; the prototype's <code>calcDelta</code> math moves verbatim. Everyone agrees, results can't be faked, zero-sum stays atomic. See Talking To It.</td></tr>
+        <tr><td>Hosting</td><td>Frontend on <strong>GitHub Pages</strong> (free static hosting; code lives on GitHub already), backend on Supabase. Browser talks to Supabase directly; cost ~free at 40 players. See Hosting And Cost.</td></tr>
+        <tr><td>Corrections</td><td><strong><code>correctMatch</code> = void/edit the match, then full-season replay</strong> (reset to 1000, re-run every non-voided match). Deterministic, atomic, admin-only; voids are marked not deleted. See Admin &amp; Corrections.</td></tr>
+        <tr><td>Live wall</td><td><strong>Supabase realtime</strong> (subscribe, refetch on change), with a 10s poll as fallback. Auto-reconnect + refetch-on-wake so it runs unattended for days. See The Live Wall.</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">4</span>The data we need to store</h2>
+    <p>A database is just a set of linked spreadsheets (&ldquo;tables&rdquo;); each has columns and rows, and rows reference each other by ID. These are the tables EF Pong needs (everything else &mdash; rankings, head-to-head, upsets &mdash; is computed from them). The full data model, with every column and relationship, is drawn out in <strong><a href="EF Pong Data Model.dc.html">EF Pong Data Model.dc.html</a></strong>:</p>
+    <table>
+      <thead><tr><th style="width:22%">Table</th><th>Columns (roughly)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Player</strong></td><td>id, name, avatar, join date, (later) login identity</td></tr>
+        <tr><td><strong>Standings</strong></td><td>id, player&rarr;Player, season&rarr;Season, current ELO, wins, losses, peak &mdash; one row per player <em>per season</em> (the cached leaderboard; past seasons frozen = Hall of Fame)</td></tr>
+        <tr><td><strong>Match</strong></td><td>id, winner&rarr;Player, loser&rarr;Player, winner score, loser score, ELO change, timestamp, season, entered-by, status (confirmed/pending/disputed)</td></tr>
+        <tr><td><strong>RatingHistory</strong></td><td>id, player&rarr;Player, match&rarr;Match, rating after, timestamp</td></tr>
+        <tr><td><strong>Season</strong></td><td>id, name, start, end, champion&rarr;Player, active flag</td></tr>
+        <tr><td><strong>Reaction</strong></td><td>id, match&rarr;Match, player&rarr;Player (or anonymous), type</td></tr>
+        <tr><td><strong>Comment</strong></td><td>id, match&rarr;Match, author&rarr;Player, text, timestamp</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">5</span>Progress &mdash; done and what's left</h2>
+    <p>The backend walkthrough is a <strong>7-step plan</strong>: the PRD's open questions, with the data model added up front. <strong>All seven steps are now done</strong> and their decisions are written into the docs above. The approach was <strong>design first (finish all seven), then build</strong> &mdash; the spec is settled, so building can begin.</p>
+    <table>
+      <thead><tr><th style="width:8%">Step</th><th style="width:32%">Topic</th><th>Status / outcome</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1</strong></td><td>The data model</td><td><span style="color:#008928;font-weight:700">Done</span> &mdash; seven tables incl. <code>standings</code>. See Data Model.</td></tr>
+        <tr><td><strong>2</strong></td><td>Where the data lives</td><td><span style="color:#008928;font-weight:700">Done</span> &mdash; Supabase. See Where Data Lives.</td></tr>
+        <tr><td><strong>3</strong></td><td>How the app talks to it (API + ELO)</td><td><span style="color:#008928;font-weight:700">Done</span> &mdash; 10-operation menu; ELO server-side in <code>logMatch</code>. See Talking To It.</td></tr>
+        <tr><td><strong>4</strong></td><td>Hosting &amp; cost</td><td><span style="color:#008928;font-weight:700">Done</span> &mdash; frontend on <strong>GitHub Pages</strong>, backend on Supabase; browser calls Supabase directly; prototype is the deploy artifact-in-waiting; ~free. See <a href="EF Pong Hosting And Cost.dc.html">Hosting And Cost</a>.</td></tr>
+        <tr><td><strong>5</strong></td><td>Auth path</td><td><span style="color:#008928;font-weight:700">Done</span> &mdash; launch Phase 1 (pick-your-name); Phase 2 email magic-link unlocks confirm/dispute; EF SSO much later. Additive &mdash; only <code>login_identity</code> gets filled, no rebuild. See <a href="EF Pong The Auth Path.dc.html">The Auth Path</a>.</td></tr>
+        <tr><td><strong>6</strong></td><td>Admin &amp; corrections</td><td><span style="color:#008928;font-weight:700">Done</span> &mdash; <code>correctMatch</code> = void/edit then full-season replay; admin-only. See <a href="EF Pong Admin And Corrections.dc.html">Admin &amp; Corrections</a>. Was: void/fix a wrong match and recompute affected ratings (the <code>correctMatch</code> operation).</td></tr>
+        <tr><td><strong>7</strong></td><td>The live wall</td><td><span style="color:#008928;font-weight:700">Done</span> &mdash; Supabase realtime, polling fallback. See <a href="EF Pong The Live Wall.dc.html">The Live Wall</a>. Was: does the display poll every few seconds or get pushed live; which is simpler to start (Supabase realtime).</td></tr>
+      </tbody>
+    </table>
+    <p>After Step 7, the spec is complete and build begins: create the Supabase project &rarr; recreate the seven tables &rarr; seed ~40 real players &rarr; point the frontend's data layer at Supabase (shapes already match) &rarr; move ELO to the server &rarr; add realtime for the wall. An optional early checkpoint: get just <code>players</code> reading live end-to-end to prove the setup.</p>
+
+    <h2><span class="num">6</span>Next: handoff to Claude Code &mdash; the build</h2>
+    <p>Design is done end-to-end. The next phase is implementation, handed to a developer using <strong>Claude Code</strong>. A ready-to-download handoff package has been prepared &mdash; <code>design_handoff_ef_pong/</code> &mdash; containing a self-sufficient <code>README.md</code> (the full spec: data model, the ten API operations, the ELO parameters, corrections, auth phases, realtime, tokens, and build order) plus copies of the prototype and all nine design docs and the design-system files needed to open them.</p>
+    <h3>What Claude Code should do, in order</h3>
+    <ol>
+      <li><strong>Set up Supabase.</strong> Create the project; recreate the <strong>seven tables</strong> from the Data Model doc (columns, types, keys, relationships).</li>
+      <li><strong>Open the first season.</strong> No player seeding &mdash; players self-register via the in-app create-player flow (each starts at 1000 ELO); the roster fills in live from day one.</li>
+      <li><strong>Prove the path.</strong> Get just <code>players</code> reading live end-to-end &mdash; confirms the GitHub Pages &harr; Supabase wiring in one small step.</li>
+      <li><strong>Wire the frontend.</strong> Recreate the prototype in a deployable codebase and swap its in-memory seeds for the <strong>ten API operations</strong> (shapes already match the tables by design &mdash; a swap, not a rebuild).</li>
+      <li><strong>Move ELO server-side.</strong> Port <code>calcDelta</code> verbatim into the <code>logMatch</code> database function (start 1000, K=24 / 40 provisional, margin multiplier, zero-sum, floor ~100); add <code>rollSeason</code> and <code>correctMatch</code> (void/edit + full-season replay).</li>
+      <li><strong>Go live.</strong> Turn on Supabase realtime for the wall (polling fallback); publish the frontend to GitHub Pages.</li>
+      <li><strong>Later, tighten trust.</strong> Phase 2 auth &mdash; enable email magic-link, fill <code>login_identity</code>, switch matches to confirm-or-dispute. EF SSO (Phase 3) much later.</li>
+    </ol>
+    <div style="background:#EAF7EE;border-left:3px solid #008928;padding:14px 18px;border-radius:0 10px 10px 0;margin:12px 0"><p style="margin:0"><strong>Deliverable:</strong> download <code>design_handoff_ef_pong/</code> as a zip and open it in Claude Code. The <code>README.md</code> is written to stand alone &mdash; a developer who wasn't in these sessions can build from it. Keep the four rules above the build steps intact: server-side ELO, atomic writes, <code>standings</code> is a rebuildable cache, and the auth/status hooks (<code>login_identity</code>, <code>match.status</code>) stay in from day one even while unused.</p></div>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

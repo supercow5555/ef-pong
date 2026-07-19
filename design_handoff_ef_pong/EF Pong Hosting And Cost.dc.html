@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .dm h2{font-family:var(--font-body);font-size:24px;line-height:30px;font-weight:700;color:#191919;margin:36px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .dm h2 .num{color:#006BD6;margin-right:12px}
+    .dm h3{font-family:var(--font-body);font-size:17px;line-height:24px;font-weight:700;color:#191919;margin:22px 0 6px}
+    .dm p, .dm li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .dm li{margin-bottom:5px}
+    .dm strong{font-weight:700}
+    .dm ul, .dm ol{padding-left:22px;margin:6px 0 12px}
+    .dm code{font-family:var(--font-mono);font-size:12.5px;background:#F5F5F5;padding:1px 5px;border-radius:4px}
+    .dm .note{background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}
+    .cmp{width:100%;border-collapse:collapse;margin:12px 0 4px;font-family:var(--font-body)}
+    .cmp th{font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919;vertical-align:bottom}
+    .cmp td{font-size:13px;line-height:20px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,.12);vertical-align:top}
+    .pick{font-size:10px;font-weight:900;letter-spacing:.5px;color:#fff;background:#008928;padding:2px 8px;border-radius:999px;vertical-align:middle}
+    .diagram{background:#F5F5F5;border-radius:16px;padding:22px;margin:14px 0}
+    .drow{display:flex;align-items:stretch;gap:14px;flex-wrap:wrap}
+    .dbox{flex:1;min-width:150px;border:1.5px solid rgba(25,25,25,.16);border-radius:12px;background:#fff;padding:14px 16px}
+    .dbox .dt{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.5px;color:#fff;border-radius:6px;padding:3px 8px;display:inline-block;margin-bottom:8px}
+    .dbox .dh{font-family:var(--font-body);font-size:14px;font-weight:700;color:#191919;margin-bottom:2px}
+    .dbox .dd{font-family:var(--font-body);font-size:12.5px;font-weight:300;line-height:18px;color:rgba(25,25,25,.7)}
+    .dconn{display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:700;color:#006BD6;padding:6px 0}
+    .cost{display:flex;align-items:baseline;gap:10px;padding:6px 0}
+    .cost .amt{font-family:var(--font-mono);font-size:20px;font-weight:700;color:#008928;min-width:96px}
+    .cost .lbl{font-family:var(--font-body);font-size:14px;font-weight:300;color:#191919}
+    .cost .lbl b{font-weight:700}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.55)">Hosting &amp; cost &middot; backend step 4</span>
+  </div>
+  <div slot="footer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(25,25,25,.12);font-family:var(--font-body);font-size:11px;color:rgba(25,25,25,.5)">
+    <span>EF Pong &mdash; where it runs, and what it costs</span>
+    <span>Confidential &middot; Internal</span>
+  </div>
+
+  <div class="dm">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Backend walkthrough &mdash; Step 4 of 7: hosting &amp; cost</div>
+    <h1 style="font-family:var(--font-body);font-size:40px;line-height:46px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-.5px">Where it runs, and what it costs</h1>
+    <p style="font-size:18px;line-height:28px;font-weight:300;margin:0 0 8px;max-width:44em">Supabase (<a href="EF Pong Where Data Lives.dc.html">Step 2</a>) already runs three of the four layers for you. This step places the last one &mdash; the app itself &mdash; so every phone and the wall can reach it, shows where the prototype fits in that picture, and adds up the bill. Short version: <strong>two managed services, both free at this size, each just a web address.</strong></p>
+
+    <h2><span class="num">1</span>Only one layer is still homeless</h2>
+    <p>Back in Step 2 we split the app into four layers. Supabase covers the bottom three &mdash; it stores your data (<strong>database</strong>), hands you the auto-generated <strong>API</strong>, and keeps both running on an always-on computer somewhere (<strong>backend hosting</strong>). That leaves exactly one thing to find a home for: the <strong>frontend</strong> &mdash; the app you already built.</p>
+    <div class="note"><strong>The good news about the frontend:</strong> it's a &ldquo;static&rdquo; app &mdash; just files (HTML, JavaScript, a stylesheet) that run <em>inside each person's browser</em>. It needs no server of its own to think for it; the thinking happens on the phone and in Supabase. Static files are the cheapest, simplest thing on the internet to host.</p></div>
+
+    <h2><span class="num">2</span>Where the frontend goes &mdash; a static host</h2>
+    <p>A <strong>static host</strong> is a service that takes your app's files and serves them at a web address, worldwide, fast. You connect it to where your code lives, and every time you update the app it re-publishes automatically. You never touch a server.</p>
+    <table class="cmp">
+      <thead><tr><th style="width:26%">Real options</th><th>What you get</th></tr></thead>
+      <tbody>
+        <tr><td><strong>GitHub Pages</strong> <span class="pick">Chosen</span></td><td>If the code lives in GitHub, publishing is one setting in the same place &mdash; no second account. Free, and it serves the files at <code>yourorg.github.io/ef-pong</code>.</td></tr>
+        <tr><td><strong>Vercel</strong></td><td>Connect the code, get a URL like <code>efpong.vercel.app</code> in minutes. Slightly slicker auto-publish and preview builds out of the box.</td></tr>
+        <tr><td><strong>Netlify</strong> / <strong>Cloudflare Pages</strong></td><td>Effectively the same deal as Vercel &mdash; fine alternatives, all free.</td></tr>
+      </tbody>
+    </table>
+    <p>All of them do the identical job here, and you can move between them later without changing a line of the app. <strong>Decision: GitHub Pages</strong> &mdash; the code will already be on GitHub, so it's the fewest moving parts and no extra sign-up.</p>
+    <div class="note"><strong>One honest note on the URL:</strong> GitHub Pages doesn't get you a <em>better</em> free address than the others &mdash; its default is <code>yourorg.github.io/ef-pong</code>, just a different shape. A genuinely nice URL like <code>efpong.ef.com</code> needs a purchased custom domain, and that works identically on Pages, Vercel or Netlify (see &sect;5).</div>
+
+    <h2><span class="num">3</span>How the office reaches it &mdash; the whole picture</h2>
+    <p>Both halves live on the public internet, each behind its own web address. An office phone opens the frontend's URL; the app files load into that phone's browser; from there the app talks <strong>directly</strong> to Supabase's URL for data. The wall display does exactly the same thing &mdash; it's just another browser open to the same address.</p>
+    <div class="diagram">
+      <div class="drow">
+        <div class="dbox" style="max-width:190px;flex:0 0 auto"><span class="dt" style="background:#191919">Office</span><div class="dh">Phones &amp; the wall screen</div><div class="dd">Any browser in the building. Nothing installed.</div></div>
+        <div class="dconn">&mdash; open the URL &rarr;</div>
+        <div class="dbox"><span class="dt" style="background:#006BD6">GitHub Pages</span><div class="dh">The frontend</div><div class="dd">Serves the app's files. <code>yourorg.github.io/ef-pong</code></div></div>
+      </div>
+      <div class="dconn" style="justify-content:flex-end;padding-right:8%">&darr; &nbsp;app (now in the browser) calls for data</div>
+      <div class="drow">
+        <div class="dbox" style="border-color:#008928"><span class="dt" style="background:#008928">Supabase</span><div class="dh">API + database + backend hosting</div><div class="dd">The seven tables, the operations menu, ELO. One project, one URL.</div></div>
+      </div>
+    </div>
+    <p style="font-size:13px;color:rgba(25,25,25,.6)">Worth noticing: the static host never talks to Supabase. It only delivers the app to the browser once; after that, the browser and Supabase talk to each other. That's why the frontend host can be so cheap &mdash; it does almost nothing.</p>
+
+    <h2><span class="num">4</span>Where the prototype fits</h2>
+    <p>The <a href="EF Pong Prototype.dc.html">prototype</a> you already have <em>is</em> the frontend &mdash; every screen, styled and clickable. The only difference between it and the deployed app is where its data comes from: today it invents data in memory and forgets it on refresh; the deployed version reads and writes the same shapes from Supabase instead.</p>
+    <ul>
+      <li><strong>It's not throwaway.</strong> The prototype is the deploy artifact-in-waiting. Its player and match shapes already match the tables (that was deliberate in <a href="EF Pong Data Model.dc.html">Step 1</a>).</li>
+      <li><strong>Going live is a swap, not a rebuild.</strong> Replace the in-memory data layer with calls to Supabase's API (Step 3's menu), publish the files to the static host, done. The look and the flows don't change.</li>
+    </ul>
+
+    <h2><span class="num">5</span>The bill</h2>
+    <p>At ~40 players this sits comfortably inside two free tiers. Realistically you pay nothing to run it.</p>
+    <div style="border:1.5px solid rgba(25,25,25,.14);border-radius:14px;padding:16px 20px;margin:12px 0">
+      <div class="cost"><span class="amt">&euro;0 / mo</span><span class="lbl"><b>GitHub Pages</b> &mdash; free static hosting. Far more traffic headroom than 40 people generate.</span></div>
+      <div class="cost"><span class="amt">&euro;0 / mo</span><span class="lbl"><b>Supabase</b> &mdash; free tier covers the database size, API calls, auth and realtime for this scale with room to spare.</span></div>
+      <div class="cost" style="border-top:1px solid rgba(25,25,25,.12);margin-top:6px;padding-top:12px"><span class="amt" style="color:#191919">~&euro;10 / yr</span><span class="lbl"><b>Optional</b> &mdash; a custom domain (e.g. <code>efpong.ef.com</code>) if you'd rather not use the free <code>.vercel.app</code> address. Purely cosmetic.</span></div>
+    </div>
+    <div class="note"><strong>Realistic worst case:</strong> only if EF Pong got dramatically more popular than one office would Supabase's paid tier (around <strong>&euro;25/mo</strong>) come into play &mdash; and even that is a comfortable, known ceiling, not a surprise. There is no per-user or per-match charge to worry about at our size.</div>
+
+    <h2><span class="num">6</span>What this step commits you to</h2>
+    <ul>
+      <li><strong>Two free homes:</strong> GitHub (code + Pages hosting the frontend) and one Supabase project for everything else &mdash; likely just one new account, since the code is on GitHub already.</li>
+      <li><strong>One place to publish the app,</strong> one place to hold the data &mdash; connected only in the browser, at runtime.</li>
+      <li><strong>No servers to manage, patch, or pay for.</strong> Both services keep themselves running.</li>
+      <li><strong>Access is by URL for now.</strong> At launch the app is reachable by anyone with the address (obscurity + the honour system, as decided). Actually restricting it to the office is the login story &mdash; that's <a href="EF Pong The Auth Path.dc.html">Step 5</a>.</li>
+    </ul>
+
+    <p style="margin-top:28px;padding-top:16px;border-top:2px solid #191919;font-size:13px;color:rgba(25,25,25,.55)">Step 4 of 7 &middot; Next: <strong>the auth path</strong> &mdash; how &ldquo;pick-your-name&rdquo; becomes a lightweight login and then EF SSO, without ever rebuilding the app.</p>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

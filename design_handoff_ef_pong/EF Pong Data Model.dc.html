@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .dm h2{font-family:var(--font-body);font-size:24px;line-height:30px;font-weight:700;color:#191919;margin:36px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .dm h2 .num{color:#006BD6;margin-right:12px}
+    .dm h3{font-family:var(--font-body);font-size:17px;line-height:24px;font-weight:700;color:#191919;margin:22px 0 6px}
+    .dm p, .dm li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .dm li{margin-bottom:5px}
+    .dm strong{font-weight:700}
+    .dm ul, .dm ol{padding-left:22px;margin:6px 0 12px}
+    .dm code{font-family:var(--font-mono);font-size:12.5px;background:#F5F5F5;padding:1px 5px;border-radius:4px}
+    .dm .note{background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}
+    .dm .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:10px 0 4px;font-family:var(--font-body);font-size:13px;font-weight:300;color:#191919}
+    .dm .legend b{font-weight:700}
+    .pk{display:inline-block;font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.5px;background:#006BD6;color:#fff;border-radius:4px;padding:1px 5px;vertical-align:middle}
+    .fk{display:inline-block;font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.5px;background:#DA2381;color:#fff;border-radius:4px;padding:1px 5px;vertical-align:middle}
+    /* table card */
+    .tbl{border:1.5px solid rgba(25,25,25,.14);border-radius:14px;overflow:hidden;margin:14px 0}
+    .tbl .th{background:#191919;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px}
+    .tbl .th .nm{font-family:var(--font-mono);font-size:15px;font-weight:700;letter-spacing:.3px}
+    .tbl .th .cap{font-family:var(--font-body);font-size:12px;font-weight:300;color:rgba(255,255,255,.7);margin-left:auto;text-align:right}
+    .row{display:grid;grid-template-columns:190px 96px 1fr;gap:12px;padding:8px 16px;border-top:1px solid rgba(25,25,25,.08);align-items:baseline}
+    .row:first-of-type{border-top:none}
+    .row .col{font-family:var(--font-mono);font-size:13px;font-weight:700;color:#191919}
+    .row .col .k{margin-left:6px}
+    .row .ty{font-family:var(--font-mono);font-size:11.5px;color:#006BD6;font-weight:700}
+    .row .ds{font-family:var(--font-body);font-size:13px;font-weight:300;line-height:19px;color:#191919}
+    .row .ds em{font-style:normal;color:rgba(25,25,25,.55)}
+    .relbox{background:#F5F5F5;border-radius:12px;padding:16px 20px;margin:12px 0}
+    .rel{font-family:var(--font-mono);font-size:13px;font-weight:700;color:#191919;padding:6px 0;line-height:20px}
+    .rel .arw{color:#DA2381;margin:0 8px}
+    .rel .many{color:#006BD6}
+    .cmp{width:100%;border-collapse:collapse;margin:12px 0 4px;font-family:var(--font-body)}
+    .cmp th{font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919;vertical-align:bottom}
+    .cmp td{font-size:13px;line-height:20px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,.12);vertical-align:top}
+    .pick{font-size:10px;font-weight:900;letter-spacing:.5px;color:#fff;background:#008928;padding:2px 8px;border-radius:999px;vertical-align:middle}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.55)">Data model &middot; backend step 1</span>
+  </div>
+  <div slot="footer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(25,25,25,.12);font-family:var(--font-body);font-size:11px;color:rgba(25,25,25,.5)">
+    <span>EF Pong &mdash; the six tables, drawn concretely</span>
+    <span>Confidential &middot; Internal</span>
+  </div>
+
+  <div class="dm">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Backend walkthrough &mdash; Step 1 of 7: the data</div>
+    <h1 style="font-family:var(--font-body);font-size:40px;line-height:46px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-.5px">The data model, drawn out</h1>
+    <p style="font-size:18px;line-height:28px;font-weight:300;margin:0 0 8px;max-width:44em">These are the PRD's tables, but concrete: every column, its type in plain terms, and the exact arrows between tables. This is the shape your database will physically take &mdash; and it already matches the <code>players</code> and <code>matches</code> shapes in the prototype, so nothing about the frontend has to change. There are <strong>seven</strong> tables: the PRD's six, plus <code>standings</code> (&sect;4), which we added to handle the quarterly reset cleanly.</p>
+
+    <h2><span class="num">1</span>How to read this</h2>
+    <p>Each box below is one table (one spreadsheet). Each line is a column: its <strong>name</strong>, its <strong>type</strong>, and what it holds. Two badges mark the special columns:</p>
+    <div class="legend">
+      <span><span class="pk">PK</span> &nbsp;<b>Primary key</b> &mdash; the row's unique ID; nothing else in the table repeats it.</span>
+      <span><span class="fk">FK</span> &nbsp;<b>Foreign key</b> &mdash; holds the ID of a row in <em>another</em> table (an arrow).</span>
+    </div>
+    <div class="legend" style="margin-top:2px">
+      <span><b>Types, in plain terms:</b></span>
+      <span><code>text</code> words</span>
+      <span><code>int</code> whole number</span>
+      <span><code>bool</code> true/false</span>
+      <span><code>timestamp</code> a date &amp; time</span>
+      <span><code>enum</code> one of a fixed set of words</span>
+    </div>
+    <div class="note"><strong>One rule worth knowing:</strong> a foreign key can only point at an ID that actually exists. The database refuses to save a match whose winner isn't a real player &mdash; so you can never end up with a match pointing at nobody. That guarantee is a big part of why we store data this way instead of in loose JSON.</div>
+
+    <h2><span class="num">2</span>The seven tables</h2>
+
+    <div class="tbl">
+      <div class="th"><span class="nm">player</span><span class="cap">one row per person on the roster (~40)</span></div>
+      <div class="row"><span class="col">id <span class="pk k">PK</span></span><span class="ty">text</span><span class="ds">Unique handle, e.g. <code>marco</code>. Everything else points here.</span></div>
+      <div class="row"><span class="col">name</span><span class="ty">text</span><span class="ds">Display name &mdash; &ldquo;Marco Rossi&rdquo;.</span></div>
+      <div class="row"><span class="col">initials</span><span class="ty">text</span><span class="ds">Avatar text &mdash; &ldquo;MR&rdquo;. <em>(Could be computed from name instead.)</em></span></div>
+      <div class="row"><span class="col">avatar_color</span><span class="ty">text</span><span class="ds">Hex for the avatar chip, e.g. <code>#006BD6</code>.</span></div>
+      <div class="row"><span class="col">join_date</span><span class="ty">timestamp</span><span class="ds">When they were added. Set automatically.</span></div>
+      <div class="row"><span class="col">login_identity</span><span class="ty">text</span><span class="ds"><em>Empty for now.</em> Later holds the verified email / EF SSO id (Step 5). Adding it later changes nothing above.</span></div>
+    </div>
+    <p style="font-size:13px;color:rgba(25,25,25,.6)">Notice what's <strong>not</strong> here: current ELO, wins, losses, rank. Those change every season, so they live in <code>standings</code> below &mdash; one row per player per season. Everything else (rank order, head-to-head, streaks) is <strong>computed on demand</strong>, never stored.</p>
+
+    <div class="tbl">
+      <div class="th"><span class="nm">standings</span><span class="cap">one row per player <em style="color:rgba(255,255,255,.55);font-style:normal">per season</em> &mdash; the leaderboard, cached</span></div>
+      <div class="row"><span class="col">id <span class="pk k">PK</span></span><span class="ty">text</span><span class="ds">Unique ID.</span></div>
+      <div class="row"><span class="col">player_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>player.id</code>.</span></div>
+      <div class="row"><span class="col">season_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>season.id</code>. The pair (player + season) is unique &mdash; one standing per person per quarter.</span></div>
+      <div class="row"><span class="col">elo</span><span class="ty">int</span><span class="ds">Current rating this season. Starts at <code>1000</code>; the server updates it on every match.</span></div>
+      <div class="row"><span class="col">wins</span><span class="ty">int</span><span class="ds">Wins this season.</span></div>
+      <div class="row"><span class="col">losses</span><span class="ty">int</span><span class="ds">Losses this season.</span></div>
+      <div class="row"><span class="col">peak</span><span class="ty">int</span><span class="ds">Highest ELO reached this season.</span></div>
+    </div>
+    <p style="font-size:13px;color:rgba(25,25,25,.6)">This is the exact set of numbers the prototype shows on each player &mdash; just moved to where they belong. Past seasons' rows stay frozen, which <em>is</em> the Hall of Fame. See &sect;4 for why this beats recomputing every read.</p>
+
+    <div class="tbl">
+      <div class="th"><span class="nm">match</span><span class="cap">one row per game played &mdash; the heart of the app</span></div>
+      <div class="row"><span class="col">id <span class="pk k">PK</span></span><span class="ty">text</span><span class="ds">Unique match ID, generated on save.</span></div>
+      <div class="row"><span class="col">winner_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>player.id</code> of the winner.</span></div>
+      <div class="row"><span class="col">loser_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>player.id</code> of the loser.</span></div>
+      <div class="row"><span class="col">winner_score</span><span class="ty">int</span><span class="ds">e.g. <code>11</code>.</span></div>
+      <div class="row"><span class="col">loser_score</span><span class="ty">int</span><span class="ds">e.g. <code>4</code>.</span></div>
+      <div class="row"><span class="col">elo_delta</span><span class="ty">int</span><span class="ds">Points transferred (winner +, loser &minus;). Computed by the server (Step 3) and <strong>frozen here</strong> so the feed always shows what really happened.</span></div>
+      <div class="row"><span class="col">season_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>season.id</code> this game counted toward.</span></div>
+      <div class="row"><span class="col">entered_by <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>player.id</code> who logged it. (Powers &ldquo;who to trust&rdquo; once login lands.)</span></div>
+      <div class="row"><span class="col">status</span><span class="ty">enum</span><span class="ds">One of <code>confirmed</code> / <code>pending</code> / <code>disputed</code>. Launch: always <code>confirmed</code>. This one column is what makes Option&nbsp;B a config change, not a rebuild.</span></div>
+      <div class="row"><span class="col">played_at</span><span class="ty">timestamp</span><span class="ds">When it happened. Set automatically; sorts the feed.</span></div>
+    </div>
+
+    <div class="tbl">
+      <div class="th"><span class="nm">rating_history</span><span class="cap">one row per player per match &mdash; the audit trail</span></div>
+      <div class="row"><span class="col">id <span class="pk k">PK</span></span><span class="ty">text</span><span class="ds">Unique ID.</span></div>
+      <div class="row"><span class="col">player_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>player.id</code>.</span></div>
+      <div class="row"><span class="col">match_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>match.id</code> that caused this change.</span></div>
+      <div class="row"><span class="col">rating_after</span><span class="ty">int</span><span class="ds">This player's ELO immediately after that match.</span></div>
+      <div class="row"><span class="col">recorded_at</span><span class="ty">timestamp</span><span class="ds">When. Powers the profile trend line and &ldquo;biggest mover&rdquo;.</span></div>
+    </div>
+    <p style="font-size:13px;color:rgba(25,25,25,.6)">This table is <em>append-only</em> history: a new row every time anyone's rating moves. It's also your safety net for admin corrections (Step 6) &mdash; you can replay it.</p>
+
+    <div class="tbl">
+      <div class="th"><span class="nm">season</span><span class="cap">one row per quarter</span></div>
+      <div class="row"><span class="col">id <span class="pk k">PK</span></span><span class="ty">text</span><span class="ds">e.g. <code>2026-q3</code>.</span></div>
+      <div class="row"><span class="col">name</span><span class="ty">text</span><span class="ds">Display &mdash; &ldquo;Q3 2026&rdquo;.</span></div>
+      <div class="row"><span class="col">starts_at</span><span class="ty">timestamp</span><span class="ds">Season start.</span></div>
+      <div class="row"><span class="col">ends_at</span><span class="ty">timestamp</span><span class="ds">Season end.</span></div>
+      <div class="row"><span class="col">champion_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>player.id</code>. Empty until the season closes, then frozen &mdash; this is the Hall of Fame.</span></div>
+      <div class="row"><span class="col">is_active</span><span class="ty">bool</span><span class="ds">Exactly one season is <code>true</code> at a time. New matches attach to it.</span></div>
+    </div>
+
+    <div class="tbl">
+      <div class="th"><span class="nm">reaction</span><span class="cap">one-tap responses on a match</span></div>
+      <div class="row"><span class="col">id <span class="pk k">PK</span></span><span class="ty">text</span><span class="ds">Unique ID.</span></div>
+      <div class="row"><span class="col">match_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>match.id</code> being reacted to.</span></div>
+      <div class="row"><span class="col">type</span><span class="ty">enum</span><span class="ds"><code>fire</code> / <code>wow</code> / <code>gg</code>. The feed just counts them.</span></div>
+      <div class="row"><span class="col">player_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds"><em>Nullable</em> &mdash; &rarr; <code>player.id</code> or empty. Reactions are anonymous at launch, so this stays empty; the column exists so you <em>can</em> attribute them later.</span></div>
+    </div>
+
+    <div class="tbl">
+      <div class="th"><span class="nm">comment</span><span class="cap">the trash talk</span></div>
+      <div class="row"><span class="col">id <span class="pk k">PK</span></span><span class="ty">text</span><span class="ds">Unique ID.</span></div>
+      <div class="row"><span class="col">match_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>match.id</code> being discussed.</span></div>
+      <div class="row"><span class="col">author_id <span class="fk k">FK</span></span><span class="ty">text</span><span class="ds">&rarr; <code>player.id</code> &mdash; the self-declared &ldquo;pick-your-name&rdquo; identity at launch, a verified one later.</span></div>
+      <div class="row"><span class="col">text</span><span class="ty">text</span><span class="ds">The comment body.</span></div>
+      <div class="row"><span class="col">posted_at</span><span class="ty">timestamp</span><span class="ds">When. Sorts the thread.</span></div>
+    </div>
+
+    <h2><span class="num">3</span>The arrows &mdash; how the tables connect</h2>
+    <p>Read <code>&rarr;</code> as &ldquo;points at one,&rdquo; and <span style="color:#006BD6;font-weight:700">many</span> as &ldquo;there can be lots of these.&rdquo; This is the whole relational structure of EF Pong on one screen:</p>
+    <div class="relbox">
+      <div class="rel"><span class="many">many</span> match <span class="arw">&rarr;</span> player <span style="font-weight:300;color:rgba(25,25,25,.6)">&nbsp; (winner, loser, entered_by &mdash; three arrows into player)</span></div>
+      <div class="rel"><span class="many">many</span> match <span class="arw">&rarr;</span> season</div>
+      <div class="rel"><span class="many">many</span> rating_history <span class="arw">&rarr;</span> player &nbsp;<span style="color:rgba(25,25,25,.4)">and</span>&nbsp; <span class="arw" style="margin-left:0">&rarr;</span> match</div>
+      <div class="rel"><span class="many">many</span> reaction <span class="arw">&rarr;</span> match</div>
+      <div class="rel"><span class="many">many</span> comment <span class="arw">&rarr;</span> match &nbsp;<span style="color:rgba(25,25,25,.4)">and</span>&nbsp; <span class="arw" style="margin-left:0">&rarr;</span> player <span style="font-weight:300;color:rgba(25,25,25,.6)">(author)</span></div>
+      <div class="rel"><span class="many">many</span> standings <span class="arw">&rarr;</span> player &nbsp;<span style="color:rgba(25,25,25,.4)">and</span>&nbsp; <span class="arw" style="margin-left:0">&rarr;</span> season <span style="font-weight:300;color:rgba(25,25,25,.6)">(unique per pair)</span></div>
+      <div class="rel"><span class="many">one</span> season <span class="arw">&rarr;</span> player <span style="font-weight:300;color:rgba(25,25,25,.6)">(champion)</span></div>
+    </div>
+    <p><code>player</code> and <code>season</code> are the two &ldquo;anchor&rdquo; tables everything else refers back to. If you can picture a match holding two player-IDs and a season-ID, you've understood the model.</p>
+
+    <h2><span class="num">4</span>Why <code>standings</code> exists <span class="pick" style="vertical-align:middle">Decided</span></h2>
+    <p>The prototype keeps <code>elo</code>, <code>wins</code>, <code>losses</code> right on each player. That's perfect for a single browser &mdash; but ratings <strong>reset every quarter</strong>, and the Hall of Fame needs the <em>old</em> numbers kept. So &ldquo;current ELO&rdquo; isn't really a fact about a player; it's a fact about <strong>a player in a season</strong>. Two honest ways to handle it &mdash; we chose B:</p>
+    <table class="cmp">
+      <thead><tr><th style="width:30%">Approach</th><th style="width:38%">How</th><th>Trade-off</th></tr></thead>
+      <tbody>
+        <tr><td><strong>A. Recompute every read</strong></td><td>Store nothing; replay all of this season's matches to get everyone's ELO whenever the leaderboard loads.</td><td>Always correct, zero duplication &mdash; but wasteful, and slower as matches pile up. Fine at 40 players, sloppy in principle.</td></tr>
+        <tr><td><strong>B. A <code>standings</code> table</strong> <span class="pick">Chosen</span></td><td>The table in &sect;2: a row per <em>player&times;season</em> holding current <code>elo</code>, <code>wins</code>, <code>losses</code>, <code>peak</code>. The server updates it when a match is saved.</td><td>One fast read for the leaderboard; past seasons stay frozen for the Hall of Fame automatically. The <code>rating_history</code> table keeps it honest if it ever drifts.</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><strong>Decision:</strong> <code>standings</code> is a first-class table (&sect;2). It's the clean answer to the seasonal reset, it makes the leaderboard a single quick query, and it's exactly the numbers the prototype already shows &mdash; just moved to where they belong. This is the only addition to the PRD's original table list, and it's additive: the frontend is unaffected.</div>
+
+    <p style="margin-top:28px;padding-top:16px;border-top:2px solid #191919;font-size:13px;color:rgba(25,25,25,.55)">Step 1 of 7 &middot; Next: <strong>where the data lives</strong> &mdash; picking an actual database as a first-timer, and why a &ldquo;backend-as-a-service&rdquo; is likely your fastest safe path.</p>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

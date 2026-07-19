@@ -1,0 +1,31 @@
+/* EF Backpack — Fonts
+   EF Circular (proprietary, Lineto) is now self-hosted from uploaded .otf files below.
+   IBM Plex Mono and Inter are the real secondary faces, delivered from Google Fonts CDN
+   (the user did not upload files for them — CDN delivery is fine). */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500&display=swap');
+
+/* ---- EF Circular (self-hosted) ---- */
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-Light.otf") format("opentype");font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-LightItalic.otf") format("opentype");font-weight:300;font-style:italic;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-Book.otf") format("opentype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-BookItalic.otf") format("opentype");font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-Medium.otf") format("opentype");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-MediumItalic.otf") format("opentype");font-weight:500;font-style:italic;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-Bold.otf") format("opentype");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-BoldItalic.otf") format("opentype");font-weight:700;font-style:italic;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-Black.otf") format("opentype");font-weight:900;font-style:normal;font-display:swap}
+@font-face{font-family:"EF Circular";src:url("../fonts/EFCircular-BlackItalic.otf") format("opentype");font-weight:900;font-style:italic;font-display:swap}
+
+:root {
+  /* Real EF Circular now leads; system stack only as a last-resort fallback. */
+  --font-family-ef-circular: "EF Circular", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-family-inter: "Inter", system-ui, sans-serif;
+
+  /* Source stores weights as named instances ("Book","Bold"…) — map to numeric CSS weights. */
+  --font-weight-light: 300;
+  --font-weight-book: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+}

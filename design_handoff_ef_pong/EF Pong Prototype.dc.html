@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0}
+    body{background:#E9EBEE;font-family:var(--font-body)}
+    .app-scroll::-webkit-scrollbar{width:0;display:none}
+    .app-scroll{scrollbar-width:none}
+    button{font-family:var(--font-body);cursor:pointer}
+    input{font-family:var(--font-body)}
+    @keyframes popIn{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+    @keyframes toastIn{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+    @keyframes tickerRow{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .tap{transition:transform .12s ease, background .15s ease, box-shadow .15s ease}
+    .tap:active{transform:scale(.97)}
+  </style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px;gap:40px;flex-wrap:wrap">
+
+  <!-- ===================== PHONE ===================== -->
+  <div style="width:400px;height:844px;background:#191919;border-radius:52px;padding:12px;box-shadow:0 40px 80px -20px rgba(25,25,25,.45), 0 0 0 2px rgba(25,25,25,.9);flex-shrink:0;position:relative">
+    <div style="width:100%;height:100%;background:#F5F5F5;border-radius:42px;overflow:hidden;position:relative;display:flex;flex-direction:column">
+
+      <!-- status bar -->
+      <div style="height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 28px 0 32px;flex-shrink:0;background:#fff">
+        <span style="font-size:14px;font-weight:700;color:#191919">9:41</span>
+        <div style="width:120px;height:26px;background:#191919;border-radius:0 0 16px 16px;position:absolute;left:50%;transform:translateX(-50%);top:0"></div>
+        <div style="display:flex;gap:6px;align-items:center;color:#191919"><i class="ph-fill ph-cell-signal-full" style="font-size:15px"></i><i class="ph-fill ph-wifi-high" style="font-size:15px"></i><i class="ph-fill ph-battery-full" style="font-size:17px"></i></div>
+      </div>
+
+      <!-- app header -->
+      <div style="flex-shrink:0;background:#fff;padding:6px 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(25,25,25,.08)">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="width:30px;height:30px;border-radius:8px;background:#006BD6;display:flex;align-items:center;justify-content:center"><i class="ph-fill ph-ping-pong" style="color:#fff;font-size:19px"></i></div>
+          <span style="font-size:20px;font-weight:900;letter-spacing:-.5px;color:#191919">EF Pong</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <sc-if value="{{ hasIdentity }}" hint-placeholder-val="{{ false }}">
+          <button class="tap" onClick="{{ onSwitchIdentity }}" title="Switch player" style="border:none;background:transparent;padding:0;width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center"><span style="width:34px;height:34px;border-radius:999px;background:{{ idColor }};color:{{ idTextColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid #E5F3FF">{{ idInitials }}</span></button>
+          </sc-if>
+          <button class="tap" onClick="{{ openWall }}" style="border:1px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;height:36px;padding:0 14px;display:flex;align-items:center;gap:6px;color:#191919"><i class="ph-bold ph-monitor" style="font-size:16px"></i><span style="font-size:13px;font-weight:700">Wall</span></button>
+        </div>
+      </div>
+
+      <!-- CONTENT -->
+      <div class="app-scroll" style="flex:1;overflow-y:auto;overflow-x:hidden">
+
+        <!-- ============ LEADERBOARD ============ -->
+        <sc-if value="{{ isLeaderboard }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:20px 16px 28px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+            <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0;letter-spacing:-.5px">Leaderboard</h1>
+            <span style="font-size:12px;font-weight:700;color:#006BD6;text-transform:uppercase;letter-spacing:.8px">{{ seasonLabel }}</span>
+          </div>
+          <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">{{ playerCount }} players &middot; live ranking</p>
+
+          <!-- podium -->
+          <sc-if value="{{ hasPodium }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:22px">
+            <sc-for list="{{ podium }}" as="p" hint-placeholder-count="3">
+              <div class="tap" onClick="{{ p.onOpen }}" style="flex:1;background:#fff;border:1px solid rgba(25,25,25,.08);border-radius:16px;padding:14px 8px 12px;text-align:center;position:relative;box-shadow:0 6px 18px -12px rgba(25,25,25,.4)">
+                <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:{{ p.medalBg }};color:{{ p.medalText }};font-size:12px;font-weight:900">{{ p.rank }}</div>
+                <div style="width:{{ p.avatarSize }};height:{{ p.avatarSize }};border-radius:999px;background:{{ p.color }};color:{{ p.textColor }};display:flex;align-items:center;justify-content:center;font-weight:700;margin:8px auto 8px;font-size:{{ p.avatarFont }};border:2px solid {{ p.ring }}">{{ p.initials }}</div>
+                <div style="font-size:13px;font-weight:700;color:#191919;line-height:1.15;margin-bottom:2px">{{ p.name }}</div>
+                <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:#006BD6">{{ p.elo }}</div>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <!-- rest of table -->
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ standings }}" as="row" hint-placeholder-count="9">
+              <div class="tap" onClick="{{ row.onOpen }}" style="display:flex;align-items:center;gap:12px;background:{{ row.bg }};border:1px solid {{ row.border }};border-radius:14px;padding:10px 12px">
+                <div style="width:22px;text-align:center;font-weight:700;font-size:15px;color:{{ row.rankColor }};flex-shrink:0">{{ row.rank }}</div>
+                <div style="width:38px;height:38px;border-radius:999px;background:{{ row.color }};color:{{ row.textColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">{{ row.initials }}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:15px;font-weight:700;color:#191919;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.name }}</span>
+                    <sc-if value="{{ row.isMe }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;font-weight:900;color:#006BD6;background:#E5F3FF;padding:1px 6px;border-radius:999px;letter-spacing:.5px">YOU</span></sc-if>
+                    <sc-if value="{{ row.provisional }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;font-weight:700;color:#946A00;background:#FFF3D6;padding:1px 6px;border-radius:999px">NEW</span></sc-if>
+                  </div>
+                  <div style="font-size:12px;color:rgba(25,25,25,.5);font-weight:400;margin-top:1px">{{ row.record }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:3px;color:{{ row.moveColor }};flex-shrink:0"><i class="{{ row.moveIcon }}" style="font-size:13px"></i><span style="font-size:12px;font-weight:700">{{ row.moveText }}</span></div>
+                <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:#191919;width:44px;text-align:right;flex-shrink:0">{{ row.elo }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ fewPlayers }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px;text-align:center;padding:18px;background:#E5F3FF;border:1px dashed rgba(0,107,214,.35);border-radius:14px">
+            <div style="font-size:13px;font-weight:700;color:#006BD6">Get the office on the board</div>
+            <div style="font-size:12px;color:rgba(25,25,25,.6);font-weight:300;margin-top:2px">Tap your avatar &rarr; &ldquo;I'm new&rdquo; to add more players.</div>
+          </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <!-- ============ LOG A MATCH ============ -->
+        <sc-if value="{{ isLog }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:20px 16px 28px">
+          <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0 0 2px;letter-spacing:-.5px">Log a match</h1>
+          <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Enter the game you just played.</p>
+
+          <!-- players -->
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ slots }}" as="s" hint-placeholder-count="2">
+              <div>
+                <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin:0 0 6px 2px">{{ s.label }}</div>
+                <button class="tap" onClick="{{ s.onToggle }}" style="width:100%;display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid {{ s.border }};border-radius:14px;padding:12px 14px;text-align:left">
+                  <div style="width:40px;height:40px;border-radius:999px;background:{{ s.color }};color:{{ s.textColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">{{ s.initials }}</div>
+                  <span style="flex:1;font-size:16px;font-weight:700;color:{{ s.nameColor }}">{{ s.name }}</span>
+                  <i class="ph-bold ph-caret-down" style="font-size:16px;color:rgba(25,25,25,.4)"></i>
+                </button>
+                <sc-if value="{{ s.open }}" hint-placeholder-val="{{ false }}">
+                <div style="background:#fff;border:1px solid rgba(25,25,25,.1);border-radius:14px;margin-top:6px;max-height:220px;overflow-y:auto;box-shadow:0 12px 28px -14px rgba(25,25,25,.5)">
+                  <sc-for list="{{ s.options }}" as="o" hint-placeholder-count="6">
+                    <button class="tap" onClick="{{ o.onPick }}" style="width:100%;display:flex;align-items:center;gap:10px;background:{{ o.bg }};border:none;border-bottom:1px solid rgba(25,25,25,.06);padding:9px 14px;text-align:left">
+                      <div style="width:30px;height:30px;border-radius:999px;background:{{ o.color }};color:{{ o.textColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0">{{ o.initials }}</div>
+                      <span style="flex:1;font-size:14px;font-weight:500;color:#191919">{{ o.name }}</span>
+                      <span style="font-family:var(--font-mono);font-size:12px;color:rgba(25,25,25,.45)">{{ o.elo }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- score -->
+          <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin:20px 0 8px 2px">Score</div>
+          <div style="display:flex;gap:12px">
+            <sc-for list="{{ scoreCards }}" as="sc" hint-placeholder-count="2">
+              <div style="flex:1;background:#fff;border:1.5px solid {{ sc.border }};border-radius:16px;padding:14px 10px;text-align:center">
+                <div style="font-size:13px;font-weight:700;color:#191919;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:10px">{{ sc.name }}</div>
+                <div style="font-family:var(--font-mono);font-size:42px;font-weight:700;line-height:1;color:{{ sc.scoreColor }};margin-bottom:12px">{{ sc.score }}</div>
+                <div style="display:flex;gap:8px;justify-content:center">
+                  <button class="tap" onClick="{{ sc.onDec }}" style="width:38px;height:38px;border-radius:999px;border:1px solid rgba(25,25,25,.15);background:#F5F5F5;display:flex;align-items:center;justify-content:center;color:#191919"><i class="ph-bold ph-minus" style="font-size:15px"></i></button>
+                  <button class="tap" onClick="{{ sc.onInc }}" style="width:38px;height:38px;border-radius:999px;border:none;background:#006BD6;display:flex;align-items:center;justify-content:center;color:#fff"><i class="ph-bold ph-plus" style="font-size:15px"></i></button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- preview -->
+          <sc-if value="{{ preview.show }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:18px;background:{{ preview.bg }};border:1px solid {{ preview.border }};border-radius:16px;padding:16px;animation:popIn .2s ease">
+            <sc-if value="{{ preview.valid }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><i class="ph-fill ph-trophy" style="color:#006BD6;font-size:18px"></i><span style="font-size:13px;font-weight:700;color:#191919">{{ preview.headline }}</span></div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:12px;padding:10px 14px">
+                  <span style="font-size:14px;font-weight:700;color:#191919">{{ preview.aName }}</span>
+                  <span style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:{{ preview.aColor }}">{{ preview.aDelta }}</span>
+                </div>
+                <div style="flex:1;display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:12px;padding:10px 14px">
+                  <span style="font-size:14px;font-weight:700;color:#191919">{{ preview.bName }}</span>
+                  <span style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:{{ preview.bColor }}">{{ preview.bDelta }}</span>
+                </div>
+              </div>
+              <sc-if value="{{ preview.upset }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;display:flex;align-items:center;gap:6px;color:#DA2381;font-size:12px;font-weight:700"><i class="ph-fill ph-lightning"></i><span>Upset! Big rating swing.</span></div></sc-if>
+            </sc-if>
+            <sc-if value="{{ preview.invalid }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:8px;color:#946A00;font-size:13px;font-weight:500"><i class="ph-fill ph-warning-circle" style="font-size:18px"></i><span>{{ preview.hint }}</span></div>
+            </sc-if>
+          </div>
+          </sc-if>
+
+          <button class="tap" onClick="{{ submitMatch }}" disabled="{{ submitDisabled }}" style="margin-top:18px;width:100%;height:54px;border:none;border-radius:999px;background:{{ submitBg }};color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-check-circle" style="font-size:20px"></i>Record match</button>
+        </div>
+        </sc-if>
+
+        <!-- ============ FEED ============ -->
+        <sc-if value="{{ isFeed }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:20px 16px 28px">
+          <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0 0 2px;letter-spacing:-.5px">Match feed</h1>
+          <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Every game, live. React and talk trash.</p>
+          <sc-if value="{{ feedEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:40px 22px;background:#fff;border:1px solid rgba(25,25,25,.08);border-radius:16px">
+            <div style="width:56px;height:56px;border-radius:16px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i class="ph ph-ping-pong" style="color:rgba(25,25,25,.35);font-size:30px"></i></div>
+            <div style="font-size:16px;font-weight:700;color:#191919">No matches yet</div>
+            <div style="font-size:13px;color:rgba(25,25,25,.55);font-weight:300;margin-top:4px">Play a game, then log it &mdash; it'll show up here for everyone to react to.</div>
+          </div>
+          </sc-if>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <sc-for list="{{ feed }}" as="m" hint-placeholder-count="5">
+              <div style="background:#fff;border:1px solid rgba(25,25,25,.08);border-radius:16px;overflow:hidden;box-shadow:0 6px 18px -14px rgba(25,25,25,.4)">
+                <sc-if value="{{ m.upset }}" hint-placeholder-val="{{ false }}"><div style="background:#DA2381;color:#fff;font-size:11px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;padding:5px 16px;display:flex;align-items:center;gap:6px"><i class="ph-fill ph-lightning"></i>Upset of the day</div></sc-if>
+                <div style="padding:14px 16px 12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                    <!-- winner -->
+                    <div style="display:flex;align-items:center;gap:10px;flex:1">
+                      <div style="width:40px;height:40px;border-radius:999px;background:{{ m.wColor }};color:{{ m.wTextColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;position:relative">{{ m.wInitials }}<i class="ph-fill ph-crown-simple" style="position:absolute;top:-9px;right:-6px;color:#FAB005;font-size:15px;transform:rotate(18deg)"></i></div>
+                      <div><div style="font-size:14px;font-weight:700;color:#191919;line-height:1.1">{{ m.wName }}</div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#008928">{{ m.wDelta }}</div></div>
+                    </div>
+                    <!-- score -->
+                    <div style="text-align:center;padding:0 6px"><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#191919;line-height:1">{{ m.score }}</div><div style="font-size:10px;color:rgba(25,25,25,.4);font-weight:700;letter-spacing:.5px">{{ m.time }}</div></div>
+                    <!-- loser -->
+                    <div style="display:flex;align-items:center;gap:10px;flex:1;justify-content:flex-end;text-align:right">
+                      <div><div style="font-size:14px;font-weight:700;color:#191919;line-height:1.1">{{ m.lName }}</div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#D1334A">{{ m.lDelta }}</div></div>
+                      <div style="width:40px;height:40px;border-radius:999px;background:{{ m.lColor }};color:{{ m.lTextColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px">{{ m.lInitials }}</div>
+                    </div>
+                  </div>
+                  <!-- reactions + comment toggle -->
+                  <div style="display:flex;align-items:center;gap:8px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px">
+                    <button class="tap" onClick="{{ m.onFire }}" style="border:1px solid {{ m.fireBorder }};background:{{ m.fireBg }};border-radius:999px;height:30px;padding:0 10px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:#191919"><span>🔥</span>{{ m.fire }}</button>
+                    <button class="tap" onClick="{{ m.onWow }}" style="border:1px solid {{ m.wowBorder }};background:{{ m.wowBg }};border-radius:999px;height:30px;padding:0 10px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:#191919"><span>😮</span>{{ m.wow }}</button>
+                    <button class="tap" onClick="{{ m.onGg }}" style="border:1px solid {{ m.ggBorder }};background:{{ m.ggBg }};border-radius:999px;height:30px;padding:0 10px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:#191919"><span>🤝</span>{{ m.gg }}</button>
+                    <button class="tap" onClick="{{ m.onToggleComments }}" style="margin-left:auto;border:none;background:transparent;display:flex;align-items:center;gap:5px;color:rgba(25,25,25,.55);font-size:13px;font-weight:700"><i class="ph-bold ph-chat-circle" style="font-size:16px"></i>{{ m.commentCount }}</button>
+                  </div>
+                  <!-- comments -->
+                  <sc-if value="{{ m.showComments }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:10px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px;display:flex;flex-direction:column;gap:8px">
+                    <sc-for list="{{ m.comments }}" as="c" hint-placeholder-count="2">
+                      <div style="display:flex;gap:8px;align-items:flex-start">
+                        <div style="width:24px;height:24px;border-radius:999px;background:{{ c.color }};color:{{ c.textColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:9px;flex-shrink:0;margin-top:1px">{{ c.initials }}</div>
+                        <div style="background:#F5F5F5;border-radius:12px;padding:7px 11px"><span style="font-size:12px;font-weight:700;color:#191919">{{ c.author }}</span> <span style="font-size:12px;color:#191919;font-weight:300">{{ c.text }}</span></div>
+                      </div>
+                    </sc-for>
+                    <div style="display:flex;gap:8px;align-items:center;margin-top:2px">
+                      <input value="{{ m.draft }}" onInput="{{ m.onDraft }}" onKeyDown="{{ m.onDraftKey }}" placeholder="Add some trash talk…" style="flex:1;height:38px;border:1px solid rgba(25,25,25,.15);border-radius:999px;padding:0 14px;font-size:13px;color:#191919;outline:none" />
+                      <button class="tap" onClick="{{ m.onSend }}" style="width:38px;height:38px;border-radius:999px;border:none;background:#006BD6;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-paper-plane-right" style="font-size:16px"></i></button>
+                    </div>
+                  </div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ PROFILE ============ -->
+        <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:16px 16px 28px">
+          <button class="tap" onClick="{{ backToLeaderboard }}" style="border:none;background:transparent;display:flex;align-items:center;gap:6px;color:rgba(25,25,25,.6);font-size:14px;font-weight:700;padding:4px 0;margin-bottom:8px"><i class="ph-bold ph-arrow-left" style="font-size:17px"></i>Leaderboard</button>
+          <!-- header -->
+          <div style="background:#fff;border:1px solid rgba(25,25,25,.08);border-radius:20px;padding:20px;text-align:center;box-shadow:0 8px 24px -16px rgba(25,25,25,.4)">
+            <div style="width:76px;height:76px;border-radius:999px;background:{{ profile.color }};color:{{ profile.textColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;margin:0 auto 10px">{{ profile.initials }}</div>
+            <div style="font-size:22px;font-weight:700;color:#191919;line-height:1.1">{{ profile.name }}</div>
+            <div style="font-size:13px;color:rgba(25,25,25,.5);font-weight:400;margin-top:2px">Rank #{{ profile.rank }} &middot; {{ profile.streak }}</div>
+            <div style="display:flex;justify-content:center;gap:0;margin-top:16px">
+              <div style="flex:1;border-right:1px solid rgba(25,25,25,.1)"><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#006BD6">{{ profile.elo }}</div><div style="font-size:11px;color:rgba(25,25,25,.5);font-weight:700;text-transform:uppercase;letter-spacing:.5px">ELO</div></div>
+              <div style="flex:1;border-right:1px solid rgba(25,25,25,.1)"><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#191919">{{ profile.record }}</div><div style="font-size:11px;color:rgba(25,25,25,.5);font-weight:700;text-transform:uppercase;letter-spacing:.5px">W&ndash;L</div></div>
+              <div style="flex:1"><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#191919">{{ profile.peak }}</div><div style="font-size:11px;color:rgba(25,25,25,.5);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Peak</div></div>
+            </div>
+            <div style="margin-top:16px"><svg viewBox="0 0 300 64" preserveAspectRatio="none" style="width:100%;height:52px"><polyline points="{{ profile.spark }}" fill="none" stroke="#006BD6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline></svg></div>
+          </div>
+
+          <!-- head to head -->
+          <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin:22px 0 8px 2px">Head-to-head</div>
+          <div style="background:#fff;border:1px solid rgba(25,25,25,.08);border-radius:16px;padding:16px">
+            <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px">
+              <sc-for list="{{ rivals }}" as="r" hint-placeholder-count="5">
+                <button class="tap" onClick="{{ r.onPick }}" style="border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.color }};border-radius:999px;height:30px;padding:0 12px;font-size:12px;font-weight:700">{{ r.name }}</button>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="text-align:center;flex:1"><div style="font-family:var(--font-mono);font-size:32px;font-weight:700;color:#006BD6">{{ h2h.myWins }}</div><div style="font-size:12px;font-weight:700;color:#191919">{{ h2h.meName }}</div></div>
+              <div style="font-size:13px;font-weight:900;color:rgba(25,25,25,.35)">vs</div>
+              <div style="text-align:center;flex:1"><div style="font-family:var(--font-mono);font-size:32px;font-weight:700;color:#191919">{{ h2h.theirWins }}</div><div style="font-size:12px;font-weight:700;color:#191919">{{ h2h.rivalName }}</div></div>
+            </div>
+            <div style="text-align:center;margin-top:8px;font-size:13px;font-weight:500;color:{{ h2h.verdictColor }}">{{ h2h.verdict }}</div>
+          </div>
+
+          <!-- recent -->
+          <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin:22px 0 8px 2px">Recent matches</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ profile.recent }}" as="g" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid rgba(25,25,25,.08);border-radius:12px;padding:10px 14px">
+                <div style="width:26px;height:26px;border-radius:8px;background:{{ g.badgeBg }};color:{{ g.badgeColor }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0">{{ g.result }}</div>
+                <span style="flex:1;font-size:14px;color:#191919;font-weight:400">vs <strong style="font-weight:700">{{ g.opp }}</strong></span>
+                <span style="font-family:var(--font-mono);font-size:13px;color:rgba(25,25,25,.6)">{{ g.score }}</span>
+                <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:{{ g.deltaColor }};width:38px;text-align:right">{{ g.delta }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <!-- BOTTOM NAV -->
+      <div style="flex-shrink:0;background:#fff;border-top:1px solid rgba(25,25,25,.08);display:flex;padding:8px 8px 22px">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+          <button class="tap" onClick="{{ t.onClick }}" style="flex:1;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;color:{{ t.color }}">
+            <i class="{{ t.icon }}" style="font-size:24px"></i>
+            <span style="font-size:10px;font-weight:700;letter-spacing:.2px">{{ t.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <!-- IDENTITY GATE -->
+      <sc-if value="{{ showGate }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;inset:0;z-index:70;background:#fff;display:flex;flex-direction:column">
+        <div style="padding:52px 26px 18px;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:26px">
+            <div style="width:34px;height:34px;border-radius:9px;background:#006BD6;display:flex;align-items:center;justify-content:center"><i class="ph-fill ph-ping-pong" style="color:#fff;font-size:21px"></i></div>
+            <span style="font-size:22px;font-weight:900;letter-spacing:-.5px;color:#191919">EF Pong</span>
+            <sc-if value="{{ gateCanClose }}" hint-placeholder-val="{{ false }}">
+              <button class="tap" onClick="{{ closeSwitch }}" style="margin-left:auto;border:none;background:#F5F5F5;width:34px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#191919"><i class="ph-bold ph-x" style="font-size:16px"></i></button>
+            </sc-if>
+          </div>
+          <h1 style="font-size:26px;font-weight:700;color:#191919;margin:0 0 6px;letter-spacing:-.5px">Who are you?</h1>
+          <p style="margin:0;font-size:14px;line-height:20px;color:rgba(25,25,25,.6);font-weight:300">Pick your name so your matches and comments are yours &mdash; or add yourself if you're new. No password &mdash; secure sign-in comes later.</p>
+        </div>
+        <div class="app-scroll" style="flex:1;overflow-y:auto;padding:4px 18px 20px;display:flex;flex-direction:column;gap:8px">
+
+          <!-- CREATE PLAYER (also the day-one empty state) -->
+          <sc-if value="{{ gateCreating }}" hint-placeholder-val="{{ false }}">
+            <sc-if value="{{ gateEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align:center;padding:14px 8px 4px">
+                <div style="width:52px;height:52px;border-radius:14px;background:#E5F3FF;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-confetti" style="color:#006BD6;font-size:26px"></i></div>
+                <div style="font-size:16px;font-weight:700;color:#191919">No players yet</div>
+                <div style="font-size:13px;color:rgba(25,25,25,.55);font-weight:300;margin-top:2px">Be the first &mdash; add yourself to start the ladder.</div>
+              </div>
+            </sc-if>
+            <div style="background:#fff;border:1.5px solid rgba(0,107,214,.25);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:14px">
+              <div style="width:64px;height:64px;border-radius:999px;background:{{ ncColor }};color:{{ ncTextColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px">{{ newInitials }}</div>
+              <input value="{{ newName }}" onInput="{{ onNewName }}" onKeyDown="{{ onNewNameKey }}" placeholder="Type your full name" style="width:100%;height:46px;border:1.5px solid rgba(25,25,25,.15);border-radius:12px;padding:0 14px;font-size:16px;font-weight:500;color:#191919;outline:none;text-align:center" />
+              <sc-if value="{{ newDupe }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:6px;color:#946A00;font-size:12px;font-weight:500;text-align:center"><i class="ph-fill ph-warning-circle" style="font-size:15px;flex-shrink:0"></i><span>Someone already has that name &mdash; add a last initial to tell you apart.</span></div>
+              </sc-if>
+              <button class="tap" onClick="{{ createPlayer }}" disabled="{{ createDisabled }}" style="width:100%;height:48px;border:none;border-radius:999px;background:{{ createBg }};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-user-plus" style="font-size:18px"></i>Add me &amp; continue</button>
+              <p style="margin:0;font-size:11px;color:rgba(25,25,25,.45);font-weight:300;text-align:center">You'll start at 1000 ELO, like everyone else.</p>
+            </div>
+            <sc-if value="{{ gateCanCancel }}" hint-placeholder-val="{{ false }}">
+              <button class="tap" onClick="{{ cancelCreate }}" style="border:none;background:transparent;color:rgba(25,25,25,.55);font-size:13px;font-weight:700;padding:6px 0">Back to the list</button>
+            </sc-if>
+          </sc-if>
+
+          <!-- PICK FROM ROSTER -->
+          <sc-if value="{{ gateListMode }}" hint-placeholder-val="{{ true }}">
+            <button class="tap" onClick="{{ openCreate }}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#E5F3FF;border:1.5px dashed rgba(0,107,214,.4);border-radius:14px;padding:12px 14px;width:100%;color:#006BD6;font-size:14px;font-weight:700"><i class="ph-bold ph-user-plus" style="font-size:18px"></i>I'm new &mdash; add me</button>
+            <sc-for list="{{ identityOptions }}" as="o" hint-placeholder-count="8">
+              <button class="tap" onClick="{{ o.onPick }}" style="display:flex;align-items:center;gap:12px;background:{{ o.bg }};border:1.5px solid {{ o.border }};border-radius:14px;padding:11px 14px;text-align:left;width:100%">
+                <div style="width:40px;height:40px;border-radius:999px;background:{{ o.color }};color:{{ o.textColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">{{ o.initials }}</div>
+                <span style="flex:1;font-size:16px;font-weight:700;color:#191919">{{ o.name }}</span>
+                <span style="font-family:var(--font-mono);font-size:13px;color:rgba(25,25,25,.45)">{{ o.elo }}</span>
+              </button>
+            </sc-for>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- TOAST -->
+      <sc-if value="{{ toast.show }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;bottom:96px;left:50%;transform:translateX(-50%);background:#191919;color:#fff;border-radius:999px;padding:12px 20px;display:flex;align-items:center;gap:8px;box-shadow:0 12px 30px -8px rgba(25,25,25,.6);animation:toastIn .25s ease;white-space:nowrap;z-index:50"><i class="ph-fill ph-check-circle" style="color:#4ADE80;font-size:18px"></i><span style="font-size:14px;font-weight:700">{{ toast.text }}</span></div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- ===================== WALL DISPLAY ===================== -->
+  <sc-if value="{{ wallOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:100;background:#0F0F0F;display:flex;flex-direction:column;padding:44px 56px 40px;overflow:hidden">
+    <div style="position:absolute;top:-160px;right:-120px;width:520px;height:520px;border-radius:999px;background:radial-gradient(circle,#006BD6 0%,transparent 70%);opacity:.28"></div>
+    <!-- wall header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:48px;height:48px;border-radius:12px;background:#006BD6;display:flex;align-items:center;justify-content:center"><i class="ph-fill ph-ping-pong" style="color:#fff;font-size:30px"></i></div>
+        <div><div style="font-size:34px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1">EF Pong</div><div style="font-size:13px;font-weight:900;letter-spacing:3px;color:#006BD6;text-transform:uppercase">Office championship &middot; {{ seasonLabel }}</div></div>
+      </div>
+      <button class="tap" onClick="{{ closeWall }}" style="border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);border-radius:999px;height:44px;padding:0 18px;display:flex;align-items:center;gap:8px;color:#fff;font-size:14px;font-weight:700"><i class="ph-bold ph-x" style="font-size:18px"></i>Exit</button>
+    </div>
+
+    <div style="display:flex;gap:32px;flex:1;margin-top:32px;position:relative;z-index:2;min-height:0">
+      <!-- left: leaderboard -->
+      <div style="flex:1.35;display:flex;flex-direction:column;min-height:0">
+        <div style="font-size:14px;font-weight:900;letter-spacing:2px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:16px">Standings</div>
+        <div style="display:flex;flex-direction:column;gap:10px;overflow:hidden">
+          <sc-for list="{{ wallRows }}" as="w" hint-placeholder-count="8">
+            <div style="display:flex;align-items:center;gap:20px;background:{{ w.bg }};border:1px solid {{ w.border }};border-radius:16px;padding:14px 22px">
+              <div style="width:40px;font-family:var(--font-mono);font-size:28px;font-weight:700;color:{{ w.rankColor }};text-align:center;flex-shrink:0">{{ w.rank }}</div>
+              <div style="width:52px;height:52px;border-radius:999px;background:{{ w.color }};color:{{ w.textColor }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">{{ w.initials }}</div>
+              <div style="flex:1;font-size:24px;font-weight:700;color:#fff">{{ w.name }}</div>
+              <div style="display:flex;align-items:center;gap:5px;color:{{ w.moveColor }}"><i class="{{ w.moveIcon }}" style="font-size:18px"></i><span style="font-size:16px;font-weight:700">{{ w.moveText }}</span></div>
+              <div style="font-size:18px;color:rgba(255,255,255,.5);font-family:var(--font-mono);width:80px;text-align:right">{{ w.record }}</div>
+              <div style="font-family:var(--font-mono);font-size:32px;font-weight:700;color:#fff;width:90px;text-align:right">{{ w.elo }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- right: champion + mover + ticker -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:20px;min-height:0">
+        <div style="background:linear-gradient(135deg,#006BD6,#0052A3);border-radius:20px;padding:24px;position:relative;overflow:hidden">
+          <div style="font-size:13px;font-weight:900;letter-spacing:2px;color:rgba(255,255,255,.7);text-transform:uppercase">Reigning champion</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-top:14px">
+            <div style="width:64px;height:64px;border-radius:999px;background:#fff;color:#006BD6;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;position:relative">{{ champ.initials }}<i class="ph-fill ph-crown-simple" style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);color:#FAB005;font-size:26px"></i></div>
+            <div><div style="font-size:28px;font-weight:900;color:#fff;line-height:1">{{ champ.name }}</div><div style="font-family:var(--font-mono);font-size:16px;color:rgba(255,255,255,.85)">{{ champ.elo }} ELO &middot; {{ champ.record }}</div></div>
+          </div>
+        </div>
+        <div style="background:rgba(218,35,129,.14);border:1px solid rgba(218,35,129,.4);border-radius:20px;padding:20px 24px">
+          <div style="font-size:13px;font-weight:900;letter-spacing:2px;color:#F472B6;text-transform:uppercase;display:flex;align-items:center;gap:8px"><i class="ph-fill ph-lightning"></i>Biggest mover</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px"><span style="font-size:24px;font-weight:700;color:#fff">{{ mover.name }}</span><span style="font-family:var(--font-mono);font-size:26px;font-weight:700;color:#4ADE80">{{ mover.delta }}</span></div>
+        </div>
+        <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:20px 24px;min-height:0;display:flex;flex-direction:column">
+          <div style="font-size:13px;font-weight:900;letter-spacing:2px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:14px">Latest results</div>
+          <div style="display:flex;flex-direction:column;gap:12px;overflow:hidden">
+            <sc-for list="{{ wallTicker }}" as="t" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:10px;animation:tickerRow .4s ease">
+                <span style="font-size:16px;font-weight:700;color:#fff;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.text }}</span>
+                <span style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:#4ADE80">{{ t.delta }}</span>
+                <span style="font-size:13px;color:rgba(255,255,255,.4);width:52px;text-align:right">{{ t.time }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    identity: null,            // who the user is (roster id); null => show the "Who are you?" gate
+    switching: false,
+    creating: false,           // create-player form open in the identity gate
+    newName: '',
+    screen: 'leaderboard',
+    wallOpen: false,
+    profileId: 'you',
+    rivalId: 'marco',
+    pickerOpen: null,          // 'a' | 'b' | null
+    logA: 'you',
+    logB: null,
+    scoreA: 11,
+    scoreB: 0,
+    drafts: {},
+    openComments: {},
+    toast: null,
+    players: this.seedPlayers(),
+    matches: this.seedMatches(),
+  };
+
+  // ---------- seed data ----------
+  seedPlayers() {
+    const B='#006BD6', P='#DA2381', G='#008928', Y='#FAB005', R='#D1334A', K='#191919', T='#0369A1', O='#C2410C';
+    const w='#fff', d='#191919';
+    return [
+      {id:'marco', name:'Marco Rossi',    initials:'MR', color:B, textColor:w, elo:1187, wins:31, losses:12, peak:1201, wk:1170, prevRank:1},
+      {id:'you',   name:'Alex Chen',      initials:'AC', color:K, textColor:w, elo:1156, wins:26, losses:14, peak:1163, wk:1120, prevRank:4},
+      {id:'sofia', name:'Sofia Nguyen',   initials:'SN', color:P, textColor:w, elo:1142, wins:28, losses:17, peak:1155, wk:1150, prevRank:2},
+      {id:'kenji', name:'Kenji Tanaka',   initials:'KT', color:G, textColor:w, elo:1098, wins:22, losses:15, peak:1110, wk:1088, prevRank:5},
+      {id:'priya', name:'Priya Patel',    initials:'PP', color:O, textColor:w, elo:1071, wins:19, losses:16, peak:1082, wk:1075, prevRank:3},
+      {id:'lars',  name:'Lars Eriksson',  initials:'LE', color:T, textColor:w, elo:1044, wins:17, losses:18, peak:1069, wk:1030, prevRank:8},
+      {id:'wei',   name:'Wei Zhang',      initials:'WZ', color:R, textColor:w, elo:1020, wins:15, losses:16, peak:1041, wk:1035, prevRank:6},
+      {id:'fatima',name:'Fatima Al-Sayed',initials:'FA', color:B, textColor:w, elo:998,  wins:14, losses:17, peak:1024, wk:1000, prevRank:7},
+      {id:'diego', name:'Diego Fernández',initials:'DF', color:Y, textColor:d, elo:972,  wins:12, losses:19, peak:1005, wk:985,  prevRank:9},
+      {id:'emma',  name:'Emma Johansson', initials:'EJ', color:P, textColor:w, elo:951,  wins:11, losses:20, peak:990,  wk:960,  prevRank:10},
+      {id:'tom',   name:'Tom Becker',     initials:'TB', color:G, textColor:w, elo:923,  wins:9,  losses:18, peak:961,  wk:930,  prevRank:11},
+      {id:'yuki',  name:'Yuki Sato',      initials:'YS', color:K, textColor:w, elo:1008, wins:3,  losses:1,  peak:1008, wk:1000, prevRank:12},
+    ];
+  }
+  seedMatches() {
+    // newest first; tsMin = minutes ago
+    return [
+      {id:'m1', wId:'you',  lId:'sofia', ws:11, ls:8,  delta:19, tsMin:35,  upset:false, r:{fire:5,wow:1,gg:2}, comments:[{a:'sofia',t:'lucky net cord on match point 😤'},{a:'marco',t:'watch your back Alex, I\'m coming for #1'}]},
+      {id:'m2', wId:'lars', lId:'marco', ws:11, ls:9,  delta:27, tsMin:95,  upset:true,  r:{fire:14,wow:9,gg:4}, comments:[{a:'kenji',t:'BIGGEST upset of the quarter 🔥'},{a:'you',t:'the king has fallen'},{a:'marco',t:'rematch. tomorrow. bring your A game.'}]},
+      {id:'m3', wId:'kenji',lId:'priya', ws:11, ls:6,  delta:16, tsMin:140, upset:false, r:{fire:3,wow:0,gg:1}, comments:[]},
+      {id:'m4', wId:'you',  lId:'marco', ws:12, ls:10, delta:24, tsMin:220, upset:false, r:{fire:9,wow:3,gg:3}, comments:[{a:'sofia',t:'what a deuce battle 👏'}]},
+      {id:'m5', wId:'sofia',lId:'kenji', ws:11, ls:4,  delta:14, tsMin:300, upset:false, r:{fire:2,wow:0,gg:0}, comments:[]},
+      {id:'m6', wId:'priya',lId:'lars',  ws:11, ls:7,  delta:17, tsMin:380, upset:false, r:{fire:1,wow:0,gg:1}, comments:[]},
+      {id:'m7', wId:'marco',lId:'you',   ws:11, ls:5,  delta:12, tsMin:1500,upset:false, r:{fire:4,wow:1,gg:2}, comments:[{a:'you',t:'off day. we go again.'}]},
+      {id:'m8', wId:'wei',  lId:'fatima',ws:11, ls:9,  delta:20, tsMin:1600,upset:false, r:{fire:1,wow:0,gg:0}, comments:[]},
+      {id:'m9', wId:'you',  lId:'kenji', ws:11, ls:7,  delta:18, tsMin:2900,upset:false, r:{fire:3,wow:0,gg:1}, comments:[]},
+      {id:'m10',wId:'marco',lId:'sofia', ws:11, ls:8,  delta:15, tsMin:3100,upset:false, r:{fire:2,wow:1,gg:0}, comments:[]},
+    ];
+  }
+
+  // ---------- elo ----------
+  expected(a, b) { return 1 / (1 + Math.pow(10, (b - a) / 400)); }
+  marginMult(diff) { return 1 + Math.log(Math.max(diff,1)) / Math.log(11); }
+  calcDelta(wElo, lElo, ws, ls, wGames) {
+    const E = this.expected(wElo, lElo);
+    const M = this.marginMult(ws - ls);
+    const K = wGames < 5 ? 40 : 24;
+    return Math.max(1, Math.round(K * M * (1 - E)));
+  }
+
+  P(id) { return this.state.players.find(p => p.id === id); }
+  sorted() { return [...this.state.players].sort((a,b) => b.elo - a.elo); }
+  rankOf(id) { return this.sorted().findIndex(p => p.id === id) + 1; }
+  games(p) { return p.wins + p.losses; }
+
+  avatarText(p) { return p.textColor; }
+  fmtTime(min) {
+    if (min < 60) return min + 'm ago';
+    if (min < 1440) return Math.round(min/60) + 'h ago';
+    return Math.round(min/1440) + 'd ago';
+  }
+  move(p) {
+    const cur = this.rankOf(p.id);
+    const rd = p.prevRank - cur;              // + = climbed
+    const ed = p.elo - p.wk;
+    if (rd > 0) return {icon:'ph-fill ph-caret-up', color:'#008928', text:'+'+rd};
+    if (rd < 0) return {icon:'ph-fill ph-caret-down', color:'#D1334A', text:''+Math.abs(rd)};
+    return {icon:'ph-bold ph-minus', color:'rgba(25,25,25,.35)', text:''+(ed>=0?'+':'')+ed};
+  }
+
+  componentDidMount() {
+    try { const s = localStorage.getItem('efpong_identity'); if (s && this.P(s)) this.setState({identity:s, logA:s, profileId:s}); } catch(e){}
+  }
+
+  // ---------- actions ----------
+  chooseIdentity = (id) => {
+    try { localStorage.setItem('efpong_identity', id); } catch(e){}
+    this.setState(st => ({identity:id, switching:false, logA: st.logA || id, profileId: st.profileId || id}));
+  };
+  openSwitch = () => this.setState({switching:true});
+  closeSwitch = () => this.setState({switching:false});
+  openCreate = () => this.setState({creating:true, newName:''});
+  closeCreate = () => this.setState({creating:false, newName:''});
+  setNewName = (v) => this.setState({newName:v});
+  mkInitials(name){ const parts=name.trim().split(/\s+/).filter(Boolean); if(!parts.length) return '?'; if(parts.length===1) return parts[0].slice(0,2).toUpperCase(); return (parts[0][0]+parts[parts.length-1][0]).toUpperCase(); }
+  newPlayerStyle(i){ const pal=[['#006BD6','#fff'],['#DA2381','#fff'],['#008928','#fff'],['#FAB005','#191919'],['#D1334A','#fff'],['#191919','#fff'],['#0369A1','#fff'],['#C2410C','#fff']]; return pal[i % pal.length]; }
+  createPlayer = () => {
+    const name = (this.state.newName||'').trim();
+    if (!name) return;
+    if (this.state.players.some(p => p.name.toLowerCase()===name.toLowerCase())) return;   // block duplicates
+    const i = this.state.players.length;
+    const st = this.newPlayerStyle(i);
+    const id = 'p'+Date.now();
+    const np = {id, name, initials:this.mkInitials(name), color:st[0], textColor:st[1], elo:1000, wins:0, losses:0, peak:1000, wk:1000, prevRank:i+1};
+    try { localStorage.setItem('efpong_identity', id); } catch(e){}
+    this.setState(s => ({players:[...s.players, np], creating:false, newName:'', identity:id, switching:false, logA:id, profileId:id}));
+  };
+  setScreen = (s) => this.setState({screen:s, pickerOpen:null});
+  openWall = () => this.setState({wallOpen:true});
+  closeWall = () => this.setState({wallOpen:false});
+  openProfile = (id) => this.setState({screen:'profile', profileId:id, rivalId: id==='marco'?'you':'marco'});
+  setRival = (id) => this.setState({rivalId:id});
+  togglePicker = (which) => this.setState(s => ({pickerOpen: s.pickerOpen===which?null:which}));
+  pickPlayer = (which, id) => this.setState(s => {
+    const other = which==='a' ? s.logB : s.logA;
+    if (id === other) return {pickerOpen:null};
+    return which==='a' ? {logA:id, pickerOpen:null} : {logB:id, pickerOpen:null};
+  });
+  bump = (which, d) => this.setState(s => {
+    const key = which==='a' ? 'scoreA' : 'scoreB';
+    return {[key]: Math.max(0, Math.min(21, s[key] + d))};
+  });
+  react = (mId, kind) => this.setState(s => ({
+    matches: s.matches.map(m => m.id===mId ? {...m, r:{...m.r, [kind]:m.r[kind]+1}} : m)
+  }));
+  toggleComments = (mId) => this.setState(s => ({openComments:{...s.openComments, [mId]: !s.openComments[mId]}}));
+  setDraft = (mId, v) => this.setState(s => ({drafts:{...s.drafts, [mId]:v}}));
+  sendComment = (mId) => this.setState(s => {
+    const txt = (s.drafts[mId]||'').trim();
+    if (!txt) return {};
+    return {
+      matches: s.matches.map(m => m.id===mId ? {...m, comments:[...m.comments, {a:s.identity, t:txt}]} : m),
+      drafts: {...s.drafts, [mId]:''},
+    };
+  });
+
+  validScore(a, b) {
+    const hi = Math.max(a,b), lo = Math.min(a,b);
+    return hi >= 11 && hi - lo >= 2 && hi <= 21;
+  }
+  submitMatch = () => {
+    const {logA, logB, scoreA, scoreB} = this.state;
+    if (!logA || !logB || logA===logB || !this.validScore(scoreA, scoreB)) return;
+    const aWon = scoreA > scoreB;
+    const wId = aWon ? logA : logB, lId = aWon ? logB : logA;
+    const ws = aWon ? scoreA : scoreB, ls = aWon ? scoreB : scoreA;
+    const W = this.P(wId), L = this.P(lId);
+    const delta = this.calcDelta(W.elo, L.elo, ws, ls, this.games(W));
+    const upset = (L.elo - W.elo) >= 150;
+    this.setState(s => ({
+      players: s.players.map(p => {
+        if (p.id===wId) return {...p, elo:p.elo+delta, wins:p.wins+1, peak:Math.max(p.peak, p.elo+delta)};
+        if (p.id===lId) return {...p, elo:Math.max(100, p.elo-delta), losses:p.losses+1};
+        return p;
+      }),
+      matches: [{id:'new'+Date.now(), wId, lId, ws, ls, delta, tsMin:0, upset, r:{fire:0,wow:0,gg:0}, comments:[]}, ...s.matches],
+      screen:'feed', pickerOpen:null, scoreA:11, scoreB:0, logB:null,
+      toast:{text: W.name.split(' ')[0]+' wins! +'+delta+' ELO'},
+    }));
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({toast:null}), 2600);
+  };
+
+  // ---------- view models ----------
+  renderVals() {
+    const S = this.state;
+    const sorted = this.sorted();
+    const me = this.P('you');
+
+    const mkRow = (p) => {
+      const mv = this.move(p);
+      const rank = this.rankOf(p.id);
+      const isMe = p.id===S.identity;
+      return {
+        id:p.id, rank, name:p.name, initials:p.initials, color:p.color, textColor:p.textColor,
+        elo:p.elo, record:p.wins+'W \u00b7 '+p.losses+'L', isMe,
+        provisional:this.games(p)<5,
+        moveIcon:mv.icon, moveColor:mv.color, moveText:mv.text,
+        rankColor: rank<=3 ? '#006BD6' : 'rgba(25,25,25,.4)',
+        bg: isMe ? '#E5F3FF' : '#fff',
+        border: isMe ? 'rgba(0,107,214,.4)' : 'rgba(25,25,25,.08)',
+        onOpen: () => this.openProfile(p.id),
+      };
+    };
+
+    const medals = [
+      {bg:'#FAB005', text:'#191919', ring:'#FAB005', size:'56px', font:'18px'},
+      {bg:'#C7CDD4', text:'#191919', ring:'#C7CDD4', size:'50px', font:'16px'},
+      {bg:'#CD8B54', text:'#fff',    ring:'#CD8B54', size:'50px', font:'16px'},
+    ];
+    const hasPodium = sorted.length >= 3;
+    const podium = hasPodium ? [1,0,2].map(rankIdx => {   // silver, gold, bronze order for visual
+      const p = sorted[rankIdx]; const m = medals[rankIdx];
+      return {rank:rankIdx+1, name:p.name.split(' ')[0], initials:p.initials, elo:p.elo,
+        color:p.color, textColor:p.textColor, medalBg:m.bg, medalText:m.text, ring:m.ring,
+        avatarSize:m.size, avatarFont:m.font, onOpen:()=>this.openProfile(p.id)};
+    }) : [];
+    const standings = (hasPodium ? sorted.slice(3) : sorted).map(mkRow);
+    const fewPlayers = !hasPodium;
+
+    // ----- tabs -----
+    const tabDef = [
+      {id:'leaderboard', label:'Ranking', icon:'ph-fill ph-ranking'},
+      {id:'log',         label:'Log',     icon:'ph-fill ph-plus-circle'},
+      {id:'feed',        label:'Feed',    icon:'ph-fill ph-chat-teardrop-text'},
+      {id:'profile',     label:'You',     icon:'ph-fill ph-user'},
+    ];
+    const activeScreen = S.screen;
+    const tabs = tabDef.map(t => ({
+      label:t.label, icon:t.icon,
+      color: (t.id===activeScreen || (t.id==='profile'&&activeScreen==='profile')) ? '#006BD6' : 'rgba(25,25,25,.4)',
+      onClick: () => t.id==='profile' ? this.openProfile(S.identity || 'you') : this.setScreen(t.id),
+    }));
+
+    // ----- log slots -----
+    const slotVM = (which) => {
+      const id = which==='a' ? S.logA : S.logB;
+      const p = id ? this.P(id) : null;
+      const open = S.pickerOpen===which;
+      const options = this.state.players
+        .filter(o => o.id !== (which==='a'?S.logB:S.logA))
+        .sort((a,b)=>b.elo-a.elo)
+        .map(o => ({name:o.name, initials:o.initials, color:o.color, textColor:o.textColor, elo:o.elo,
+          bg: o.id===id ? '#E5F3FF' : '#fff', onPick:()=>this.pickPlayer(which, o.id)}));
+      return {
+        label: which==='a' ? 'Player 1' : 'Player 2',
+        name: p ? p.name : 'Select player',
+        nameColor: p ? '#191919' : 'rgba(25,25,25,.4)',
+        initials: p ? p.initials : '?',
+        color: p ? p.color : '#E0E0E0',
+        textColor: p ? p.textColor : 'rgba(25,25,25,.5)',
+        border: open ? '#006BD6' : 'rgba(25,25,25,.12)',
+        open, options,
+        onToggle: () => this.togglePicker(which),
+      };
+    };
+    const slots = [slotVM('a'), slotVM('b')];
+
+    const scName = (id, fb) => id ? this.P(id).name.split(' ')[0] : fb;
+    const scoreCards = [
+      {name:scName(S.logA,'Player 1'), score:S.scoreA, scoreColor: S.scoreA>=S.scoreB?'#006BD6':'#191919',
+        border: S.pickerOpen? 'rgba(25,25,25,.1)':'rgba(25,25,25,.1)', onInc:()=>this.bump('a',1), onDec:()=>this.bump('a',-1)},
+      {name:scName(S.logB,'Player 2'), score:S.scoreB, scoreColor: S.scoreB>S.scoreA?'#006BD6':'#191919',
+        border:'rgba(25,25,25,.1)', onInc:()=>this.bump('b',1), onDec:()=>this.bump('b',-1)},
+    ];
+
+    // ----- preview -----
+    const bothPicked = S.logA && S.logB && S.logA!==S.logB;
+    const valid = bothPicked && this.validScore(S.scoreA, S.scoreB);
+    let preview = {show:false};
+    if (bothPicked) {
+      if (valid) {
+        const aWon = S.scoreA > S.scoreB;
+        const A = this.P(S.logA), Bp = this.P(S.logB);
+        const W = aWon?A:Bp, L = aWon?Bp:A;
+        const ws = aWon?S.scoreA:S.scoreB, ls = aWon?S.scoreB:S.scoreA;
+        const d = this.calcDelta(W.elo, L.elo, ws, ls, this.games(W));
+        const upset = (L.elo - W.elo) >= 150;
+        preview = {show:true, valid:true, invalid:false, upset,
+          bg:'#F0F7FF', border:'rgba(0,107,214,.25)',
+          headline: W.name.split(' ')[0]+' wins '+ws+'\u2013'+ls,
+          aName:A.name.split(' ')[0], aDelta:(aWon?'+':'\u2212')+d, aColor:aWon?'#008928':'#D1334A',
+          bName:Bp.name.split(' ')[0], bDelta:(aWon?'\u2212':'+')+d, bColor:aWon?'#D1334A':'#008928'};
+      } else {
+        preview = {show:true, valid:false, invalid:true, bg:'#FFF9E9', border:'rgba(250,176,5,.4)',
+          hint:'A game goes to 11, win by 2 (e.g. 11\u20138 or 13\u201311).'};
+      }
+    }
+    const canSubmit = valid;
+
+    // ----- feed -----
+    const rk = (id) => this.P(id);
+    const feed = S.matches.map(m => {
+      const W = rk(m.wId), L = rk(m.lId);
+      const open = !!S.openComments[m.id];
+      const rb = (n)=> n>0 ? 'rgba(0,107,214,.08)' : '#fff';
+      const rbd = (n)=> n>0 ? 'rgba(0,107,214,.3)' : 'rgba(25,25,25,.12)';
+      return {
+        id:m.id, upset:m.upset,
+        wName:W.name.split(' ')[0], wInitials:W.initials, wColor:W.color, wTextColor:W.textColor, wDelta:'+'+m.delta,
+        lName:L.name.split(' ')[0], lInitials:L.initials, lColor:L.color, lTextColor:L.textColor, lDelta:'\u2212'+m.delta,
+        score:m.ws+'\u2013'+m.ls, time:this.fmtTime(m.tsMin),
+        fire:m.r.fire, wow:m.r.wow, gg:m.r.gg,
+        fireBg:rb(m.r.fire), fireBorder:rbd(m.r.fire), wowBg:rb(m.r.wow), wowBorder:rbd(m.r.wow), ggBg:rb(m.r.gg), ggBorder:rbd(m.r.gg),
+        onFire:()=>this.react(m.id,'fire'), onWow:()=>this.react(m.id,'wow'), onGg:()=>this.react(m.id,'gg'),
+        commentCount:m.comments.length, showComments:open, onToggleComments:()=>this.toggleComments(m.id),
+        comments: m.comments.map(c => { const cp=rk(c.a); return {author:cp?cp.name.split(' ')[0]:c.a, text:c.t,
+          initials:cp?cp.initials:'?', color:cp?cp.color:'#999', textColor:cp?cp.textColor:'#fff'}; }),
+        draft: S.drafts[m.id]||'',
+        onDraft:(e)=>this.setDraft(m.id, e.target.value),
+        onDraftKey:(e)=>{ if(e.key==='Enter') this.sendComment(m.id); },
+        onSend:()=>this.sendComment(m.id),
+      };
+    });
+
+    // ----- profile -----
+    const pp = this.P(S.profileId);
+    const streakTxt = pp.wins>pp.losses ? 'On the rise' : 'Fighting back';
+    // spark from matches involving player, oldest->newest ending at current elo
+    const involved = [...S.matches].filter(m => m.wId===pp.id || m.lId===pp.id).reverse();
+    let series = [pp.wk];
+    let run = pp.wk;
+    involved.forEach(m => { run += (m.wId===pp.id ? Math.round(m.delta*0.7) : -Math.round(m.delta*0.7)); series.push(run); });
+    series.push(pp.elo);
+    const mn = Math.min(...series), mx = Math.max(...series), rng = Math.max(1, mx-mn);
+    const spark = series.map((v,i) => {
+      const x = (i/(series.length-1))*300;
+      const y = 58 - ((v-mn)/rng)*52;
+      return x.toFixed(1)+','+y.toFixed(1);
+    }).join(' ');
+    const recent = involved.slice().reverse().slice(0,5).map(m => {
+      const won = m.wId===pp.id; const opp = rk(won?m.lId:m.wId);
+      return {result:won?'W':'L', badgeBg:won?'#DCF5E3':'#FCE4E8', badgeColor:won?'#008928':'#D1334A',
+        opp:opp.name.split(' ')[0], score:m.ws+'\u2013'+m.ls,
+        delta:(won?'+':'\u2212')+m.delta, deltaColor:won?'#008928':'#D1334A'};
+    });
+    const profile = {name:pp.name, initials:pp.initials, color:pp.color, textColor:pp.textColor,
+      rank:this.rankOf(pp.id), elo:pp.elo, record:pp.wins+'\u2013'+pp.losses, peak:pp.peak,
+      streak:streakTxt, spark, recent};
+
+    // rivals chips (exclude self)
+    const rivals = this.state.players.filter(p=>p.id!==pp.id).sort((a,b)=>b.elo-a.elo).slice(0,6).map(r => ({
+      name:r.name.split(' ')[0],
+      bg: r.id===S.rivalId ? '#006BD6' : '#fff',
+      color: r.id===S.rivalId ? '#fff' : '#191919',
+      border: r.id===S.rivalId ? '#006BD6' : 'rgba(25,25,25,.15)',
+      onPick:()=>this.setRival(r.id),
+    }));
+    const rival = this.P(S.rivalId) || this.P('marco');
+    let myWins=0, theirWins=0;
+    S.matches.forEach(m => {
+      if (m.wId===pp.id && m.lId===rival.id) myWins++;
+      else if (m.wId===rival.id && m.lId===pp.id) theirWins++;
+    });
+    let verdict, vColor;
+    if (myWins>theirWins){verdict=pp.name.split(' ')[0]+' leads '+myWins+'\u2013'+theirWins;vColor='#008928';}
+    else if (theirWins>myWins){verdict=rival.name.split(' ')[0]+' leads '+theirWins+'\u2013'+myWins;vColor='#D1334A';}
+    else if (myWins===0){verdict='No matches yet \u2014 book a game';vColor='rgba(25,25,25,.5)';}
+    else {verdict='All square, '+myWins+'\u2013'+theirWins;vColor='rgba(25,25,25,.6)';}
+    const h2h = {myWins, theirWins, meName:pp.name.split(' ')[0], rivalName:rival.name.split(' ')[0], verdict, verdictColor:vColor};
+
+    // ----- wall -----
+    const wallRows = sorted.slice(0,8).map(p => {
+      const mv=this.move(p); const rank=this.rankOf(p.id);
+      return {rank, name:p.name, initials:p.initials, color:p.color, textColor:p.textColor, elo:p.elo,
+        record:p.wins+'\u2013'+p.losses, moveIcon:mv.icon, moveText:mv.text,
+        moveColor: mv.color==='#008928'?'#4ADE80':(mv.color==='#D1334A'?'#F87171':'rgba(255,255,255,.4)'),
+        rankColor: rank===1?'#FAB005':(rank<=3?'#006BD6':'rgba(255,255,255,.5)'),
+        bg: rank===1?'rgba(250,176,5,.1)':'rgba(255,255,255,.04)',
+        border: rank===1?'rgba(250,176,5,.4)':'rgba(255,255,255,.09)'};
+    });
+    const champP = sorted[0];
+    const champ = {name:champP.name, initials:champP.initials, elo:champP.elo, record:champP.wins+'\u2013'+champP.losses};
+    const moverP = [...this.state.players].sort((a,b)=>(b.elo-b.wk)-(a.elo-a.wk))[0];
+    const mover = {name:moverP.name, delta:'+'+(moverP.elo-moverP.wk)};
+    const wallTicker = S.matches.slice(0,5).map(m => {
+      const W=rk(m.wId), L=rk(m.lId);
+      return {text:W.name.split(' ')[0]+' def. '+L.name.split(' ')[0]+' '+m.ws+'\u2013'+m.ls, delta:'+'+m.delta, time:this.fmtTime(m.tsMin)};
+    });
+
+    // ----- identity gate -----
+    const nm = (S.newName||'').trim();
+    const newDupe = nm.length>0 && this.state.players.some(p => p.name.toLowerCase()===nm.toLowerCase());
+    const ncStyle = this.newPlayerStyle(this.state.players.length);
+    const gateCreating = S.creating || this.state.players.length===0;
+    const createDisabled = nm.length===0 || newDupe;
+
+    const idP = S.identity ? this.P(S.identity) : null;
+    const identityOptions = sorted.map(p => ({
+      name:p.name, initials:p.initials, color:p.color, textColor:p.textColor, elo:p.elo,
+      bg: p.id===S.identity ? '#E5F3FF' : '#fff',
+      border: p.id===S.identity ? 'rgba(0,107,214,.4)' : 'rgba(25,25,25,.08)',
+      onPick: () => this.chooseIdentity(p.id),
+    }));
+
+    return {
+      showGate: !S.identity || S.switching,
+      gateCanClose: !!S.identity,
+      identityOptions,
+      gateCreating,
+      gateListMode: !gateCreating,
+      gateEmpty: this.state.players.length===0,
+      gateCanCancel: S.creating && this.state.players.length>0,
+      newName: S.newName||'',
+      newInitials: nm ? this.mkInitials(nm) : '?',
+      ncColor: ncStyle[0], ncTextColor: ncStyle[1],
+      newDupe, createDisabled,
+      createBg: createDisabled ? 'rgba(25,25,25,.2)' : '#006BD6',
+      onNewName: (e) => this.setNewName(e.target.value),
+      onNewNameKey: (e) => { if (e.key==='Enter') this.createPlayer(); },
+      createPlayer: this.createPlayer,
+      openCreate: this.openCreate,
+      cancelCreate: this.closeCreate,
+      closeSwitch: this.closeSwitch,
+      onSwitchIdentity: this.openSwitch,
+      hasIdentity: !!idP,
+      idInitials: idP ? idP.initials : '?',
+      idColor: idP ? idP.color : '#E0E0E0',
+      idTextColor: idP ? idP.textColor : 'rgba(25,25,25,.5)',
+      isLeaderboard: S.screen==='leaderboard', isLog: S.screen==='log', isFeed: S.screen==='feed', isProfile: S.screen==='profile',
+      wallOpen: S.wallOpen, openWall:this.openWall, closeWall:this.closeWall,
+      seasonLabel:'Q3 2026', playerCount:this.state.players.length,
+      podium, standings, hasPodium, fewPlayers, feedEmpty: feed.length===0, tabs,
+      slots, scoreCards, preview, submitMatch:this.submitMatch,
+      submitDisabled: !canSubmit, submitBg: canSubmit ? '#006BD6' : 'rgba(25,25,25,.2)',
+      feed,
+      profile, rivals, h2h, backToLeaderboard:()=>this.setScreen('leaderboard'),
+      wallRows, champ, mover, wallTicker,
+      toast: S.toast ? {show:true, text:S.toast.text} : {show:false, text:''},
+    };
+  }
+}
+</script>
+</body>
+</html>

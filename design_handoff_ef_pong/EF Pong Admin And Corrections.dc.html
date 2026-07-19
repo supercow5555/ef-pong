@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .dm h2{font-family:var(--font-body);font-size:24px;line-height:30px;font-weight:700;color:#191919;margin:36px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .dm h2 .num{color:#006BD6;margin-right:12px}
+    .dm h3{font-family:var(--font-body);font-size:17px;line-height:24px;font-weight:700;color:#191919;margin:22px 0 6px}
+    .dm p, .dm li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .dm li{margin-bottom:5px}
+    .dm strong{font-weight:700}
+    .dm ul, .dm ol{padding-left:22px;margin:6px 0 12px}
+    .dm code{font-family:var(--font-mono);font-size:12.5px;background:#F5F5F5;padding:1px 5px;border-radius:4px}
+    .dm .note{background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}
+    .dm .warn{background:#FDECEF;border-left:3px solid #D1334A;padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}
+    .cmp{width:100%;border-collapse:collapse;margin:12px 0 4px;font-family:var(--font-body)}
+    .cmp th{font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919;vertical-align:bottom}
+    .cmp td{font-size:13px;line-height:20px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,.12);vertical-align:top}
+    .pick{font-size:10px;font-weight:900;letter-spacing:.5px;color:#fff;background:#008928;padding:2px 8px;border-radius:999px;vertical-align:middle}
+    .flow{background:#191919;border-radius:14px;padding:18px 22px;margin:14px 0}
+    .flow .fl{font-family:var(--font-mono);font-size:13px;line-height:26px;color:#F5F5F5}
+    .flow .fl .n{color:#4ADE80;font-weight:700;margin-right:8px}
+    .flow .fl .hi{color:#5BB8FF;font-weight:700}
+    .flow .fl .cm{color:rgba(245,245,245,.5)}
+    .chain{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+    .chip{font-family:var(--font-mono);font-size:12px;font-weight:700;border-radius:8px;padding:7px 11px;border:1.5px solid rgba(25,25,25,.16);background:#fff;color:#191919}
+    .chip.bad{border-color:#D1334A;background:#FDECEF;color:#D1334A}
+    .chip.tainted{border-color:#FAB005;background:#FFF7E0;color:#946A00}
+    .chain .ar{color:rgba(25,25,25,.4);font-family:var(--font-mono);font-weight:700}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.55)">Admin &amp; corrections &middot; backend step 6</span>
+  </div>
+  <div slot="footer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(25,25,25,.12);font-family:var(--font-body);font-size:11px;color:rgba(25,25,25,.5)">
+    <span>EF Pong &mdash; fixing a wrong match, safely</span>
+    <span>Confidential &middot; Internal</span>
+  </div>
+
+  <div class="dm">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Backend walkthrough &mdash; Step 6 of 7: admin &amp; corrections</div>
+    <h1 style="font-family:var(--font-body);font-size:40px;line-height:46px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-.5px">Fixing a wrong match, safely</h1>
+    <p style="font-size:18px;line-height:28px;font-weight:300;margin:0 0 8px;max-width:44em">Someone will fat-finger a score, log the winner as the loser, or pick the wrong opponent. This step defines <code>correctMatch</code> &mdash; how an admin voids or fixes one match and puts <strong>every rating it touched</strong> back the way it should be. The hard part isn't the edit; it's undoing the ripple the bad match sent through the ladder.</p>
+
+    <h2><span class="num">1</span>Why you can't just delete the row</h2>
+    <p>ELO is <strong>zero-sum and chained</strong>: every match reads the two players' <em>current</em> ratings and moves them. So a wrong match doesn't just record one bad result &mdash; it feeds a wrong starting number into every match those players played <em>afterward</em>. Quietly deleting the bad row leaves all that downstream damage in place.</p>
+    <div class="chain">
+      <span class="chip">M1 &nbsp;ok</span><span class="ar">&rarr;</span>
+      <span class="chip bad">M2 &nbsp;WRONG</span><span class="ar">&rarr;</span>
+      <span class="chip tainted">M3</span><span class="ar">&rarr;</span>
+      <span class="chip tainted">M4</span><span class="ar">&rarr;</span>
+      <span class="chip tainted">M5</span>
+    </div>
+    <p style="font-size:13px;color:rgba(25,25,25,.6);margin-top:0">Fix M2 and every <span style="color:#946A00;font-weight:700">downstream</span> match needs its numbers recomputed too, because each was calculated from ratings the wrong match had already nudged.</p>
+
+    <h2><span class="num">2</span>The safety net you already built</h2>
+    <p>Correcting is only possible because two things from <a href="EF Pong Data Model.dc.html">Step 1</a> are true: every match is stored <strong>in order</strong> with its raw facts (who played, the score), and <code>rating_history</code> is an <strong>append-only log</strong> of every rating change. Together they mean the season can be <strong>replayed from scratch</strong> and will land on exactly the same numbers &mdash; the ELO formula is deterministic (<a href="EF Pong Talking To It.dc.html">Step 3</a>). Nothing is lost; nothing is guessed.</p>
+
+    <h2><span class="num">3</span>The fix: void or edit, then replay</h2>
+    <p>Every correction is the same two moves &mdash; change the one bad match, then rebuild the ratings that depended on it.</p>
+    <table class="cmp">
+      <thead><tr><th style="width:26%">Situation</th><th style="width:32%">Move 1 &mdash; the edit</th><th>Move 2 &mdash; the rebuild</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Match never happened</strong> (double-logged, fake)</td><td><strong>Void</strong> it &mdash; mark the row voided so it no longer counts.</td><td rowspan="2" style="vertical-align:middle">Replay the season, then rewrite <code>standings</code> + <code>rating_history</code>.</td></tr>
+        <tr><td><strong>Wrong details</strong> (score, or winner/loser swapped)</td><td><strong>Edit</strong> the match's facts to the truth.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>How &ldquo;replay&rdquo; works &mdash; and the simplest version to ship</h3>
+    <p>You could recompute only from the corrected match forward. Simpler and just as fast at our size: <strong>replay the entire active season from scratch.</strong> Reset everyone to <code>1000</code>, run every non-voided match of the season back through the same <code>logMatch</code> math in time order, and overwrite <code>standings</code> and <code>rating_history</code> with the results. A season is at most a few hundred matches, so this is instant &mdash; and it's the version that's <em>obviously</em> correct, which is what you want for anything touching ratings.</p>
+    <div class="note"><strong>Decision: <code>correctMatch</code> = void/edit the match, then full-season replay.</strong> One code path covers both void and edit, it reuses the ELO you already trust, and &ldquo;recompute the whole season&rdquo; is nearly impossible to get subtly wrong. Optimise to a partial replay only if a season ever grows big enough to notice &mdash; unlikely at 40 players.</div>
+
+    <h2><span class="num">4</span>What <code>correctMatch</code> does, in order</h2>
+    <p>Same shape as <code>logMatch</code> (<a href="EF Pong Talking To It.dc.html">Step 3, &sect;4</a>) &mdash; a server-side function, all-or-nothing:</p>
+    <div class="flow">
+      <div class="fl"><span class="n">1</span>Admin picks the match and chooses <span class="hi">void</span> or <span class="hi">edit</span> <span class="cm">&mdash; with the corrected facts</span></div>
+      <div class="fl"><span class="n">2</span>Apply the change to that one <span class="hi">match</span> row</div>
+      <div class="fl"><span class="n">3</span>Reset the season's <span class="hi">standings</span> to 1000 and clear its <span class="hi">rating_history</span></div>
+      <div class="fl"><span class="n">4</span>Replay every non-voided match of the season in <span class="hi">time order</span>, recomputing each delta</div>
+      <div class="fl"><span class="n">5</span>Rewrite <span class="hi">standings</span> and re-append <span class="hi">rating_history</span> from the replay</div>
+      <div class="fl"><span class="n">6</span>Done as <span class="hi">one unit</span> <span class="cm">&mdash; the feed &amp; leaderboard now show the corrected reality</span></div>
+    </div>
+    <p style="font-size:13px;color:rgba(25,25,25,.6)">Because steps 2&ndash;5 succeed or fail together, nobody ever sees a half-corrected ladder &mdash; the same atomic guarantee that protects <code>logMatch</code>.</p>
+
+    <h2><span class="num">5</span>Who's allowed to do it</h2>
+    <p>Corrections are powerful, so they're locked to <strong>a single admin</strong> &mdash; the product owner &mdash; matching the moderation decision in the PRD. How that's enforced tracks the <a href="EF Pong The Auth Path.dc.html">auth path</a>:</p>
+    <table class="cmp">
+      <thead><tr><th style="width:30%">Phase</th><th>Who can run <code>correctMatch</code> &amp; <code>rollSeason</code></th></tr></thead>
+      <tbody>
+        <tr><td><strong>Launch (pick-your-name)</strong></td><td>No public admin UI. The owner runs corrections directly in the Supabase dashboard, or via a hidden owner-only action. Rare enough that this is fine.</td></tr>
+        <tr><td><strong>After login (Phase 2+)</strong></td><td>An <code>is_admin</code> flag on the owner's player/identity; the server rejects the operation for anyone else. Same door for deleting comments.</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="num">6</span>Why this keeps the data honest</h2>
+    <ul>
+      <li><strong>Nothing is silently lost.</strong> A void is a marked state, not a hard delete; the original match still exists, just excluded from the replay. You can always see what was corrected.</li>
+      <li><strong>Auditable.</strong> Because the fix is &ldquo;replay from the stored facts,&rdquo; the corrected ratings are reproducible &mdash; and you can record who corrected what if disputes ever need it.</li>
+      <li><strong>Self-healing.</strong> If <code>standings</code> (the cache) ever drifts for any reason, the exact same replay rebuilds it from the matches. Corrections and cache-repair are one mechanism.</li>
+    </ul>
+    <div class="warn"><strong>Guardrail:</strong> keep corrections admin-only and rare. They rewrite history for good reasons (a genuine mistake), so the bar to run one should stay high &mdash; it's a fix tool, not an undo button for a loss you didn't like.</div>
+
+    <p style="margin-top:28px;padding-top:16px;border-top:2px solid #191919;font-size:13px;color:rgba(25,25,25,.55)">Step 6 of 7 &middot; Next: <strong>the live wall</strong> &mdash; does the office display poll every few seconds or get pushed updates live, and which is simpler to start with.</p>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/tokens/base.css">
+  <link rel="stylesheet" href="_ds/ef-backpack-design-system-bfaad97e-1b24-4bc8-916c-24ff16479d76/styles.css">
+  <style>
+    doc-page:not(:defined){visibility:hidden}
+    a, a:link{color:#006BD6;text-decoration:underline;text-underline-offset:2px}
+    a:hover{color:#191919}
+    .dm h2{font-family:var(--font-body);font-size:24px;line-height:30px;font-weight:700;color:#191919;margin:36px 0 4px;padding-top:14px;border-top:2px solid #191919}
+    .dm h2 .num{color:#006BD6;margin-right:12px}
+    .dm h3{font-family:var(--font-body);font-size:17px;line-height:24px;font-weight:700;color:#191919;margin:22px 0 6px}
+    .dm p, .dm li{font-family:var(--font-body);font-size:15px;line-height:24px;font-weight:300;color:#191919;text-wrap:pretty}
+    .dm li{margin-bottom:5px}
+    .dm strong{font-weight:700}
+    .dm ul, .dm ol{padding-left:22px;margin:6px 0 12px}
+    .dm code{font-family:var(--font-mono);font-size:12.5px;background:#F5F5F5;padding:1px 5px;border-radius:4px}
+    .dm .note{background:#E5F3FF;border-left:3px solid #006BD6;padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}
+    .dm .done{background:#EAF7EE;border-left:3px solid #008928;padding:14px 18px;border-radius:0 10px 10px 0;margin:12px 0}
+    .cmp{width:100%;border-collapse:collapse;margin:12px 0 4px;font-family:var(--font-body)}
+    .cmp th{font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919;text-align:left;padding:8px 12px;border-bottom:2px solid #191919;vertical-align:bottom}
+    .cmp td{font-size:13px;line-height:20px;font-weight:300;color:#191919;padding:9px 12px;border-bottom:1px solid rgba(25,25,25,.12);vertical-align:top}
+    .pick{font-size:10px;font-weight:900;letter-spacing:.5px;color:#fff;background:#008928;padding:2px 8px;border-radius:999px;vertical-align:middle}
+    .flow{background:#191919;border-radius:14px;padding:18px 22px;margin:14px 0}
+    .flow .fl{font-family:var(--font-mono);font-size:13px;line-height:26px;color:#F5F5F5}
+    .flow .fl .n{color:#4ADE80;font-weight:700;margin-right:8px}
+    .flow .fl .hi{color:#5BB8FF;font-weight:700}
+    .flow .fl .cm{color:rgba(245,245,245,.5)}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+    .card{border:1.5px solid rgba(25,25,25,.14);border-radius:14px;padding:16px 18px}
+    .card.win{border-color:#006BD6;background:#F0F7FF}
+    .card .ct{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.5px;color:#fff;border-radius:6px;padding:3px 9px;display:inline-block;margin-bottom:8px}
+    .card h4{font-family:var(--font-body);font-size:16px;font-weight:700;color:#191919;margin:0 0 6px}
+    .card p{margin:0 0 6px}
+    .step{margin:26px 0 8px;padding-top:16px;border-top:2px solid #191919}
+  </style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="100%,100%">
+  <div slot="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(25,25,25,.12);font-family:var(--font-body)">
+    <span style="font-size:15px;font-weight:900;letter-spacing:1px;color:#191919">EF PONG <span style="color:#006BD6">///</span></span>
+    <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.55)">The live wall &middot; backend step 7</span>
+  </div>
+  <div slot="footer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(25,25,25,.12);font-family:var(--font-body);font-size:11px;color:rgba(25,25,25,.5)">
+    <span>EF Pong &mdash; keeping the office display live</span>
+    <span>Confidential &middot; Internal</span>
+  </div>
+
+  <div class="dm">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#006BD6;margin-bottom:10px">Backend walkthrough &mdash; Step 7 of 7: the live wall</div>
+    <h1 style="font-family:var(--font-body);font-size:40px;line-height:46px;font-weight:700;color:#191919;margin:0 0 10px;letter-spacing:-.5px">Keeping the wall live</h1>
+    <p style="font-size:18px;line-height:28px;font-weight:300;margin:0 0 8px;max-width:44em">The office display has to stay current on its own &mdash; nobody walks over to tap refresh. There are two honest ways to keep a screen fresh: it can keep <strong>asking</strong> for news, or the server can <strong>tell</strong> it the moment something changes. This last step picks between them and settles what &ldquo;live&rdquo; actually costs to build.</p>
+
+    <h2><span class="num">1</span>The two ways a screen stays fresh</h2>
+    <div class="two">
+      <div class="card">
+        <span class="ct" style="background:#946A00">Polling</span>
+        <h4>Keep asking</h4>
+        <p>The wall re-runs <code>getLeaderboard</code> and <code>getFeed</code> every few seconds and redraws if anything changed.</p>
+        <p style="color:rgba(25,25,25,.65);font-size:13px"><strong>+</strong> Dead simple, works everywhere, self-healing.<br><strong>&minus;</strong> A few seconds of lag; constant requests (trivial at our size).</p>
+      </div>
+      <div class="card win">
+        <span class="ct" style="background:#006BD6">Push (realtime)</span>
+        <h4>Get told</h4>
+        <p>The wall <em>subscribes</em> once; the server pushes a nudge the instant a match, reaction or comment is written, and the wall refreshes.</p>
+        <p style="color:rgba(25,25,25,.65);font-size:13px"><strong>+</strong> Instant, efficient, feels alive.<br><strong>&minus;</strong> A touch more setup than a timer.</p>
+      </div>
+    </div>
+
+    <h2><span class="num">2</span>Why push is basically free here</h2>
+    <p>Normally push is the fancier, harder option &mdash; but from <a href="EF Pong Where Data Lives.dc.html">Step 2</a>, Supabase ships <strong>realtime</strong> in the same box as the database. You can subscribe to a table (&ldquo;tell me whenever <code>match</code> changes&rdquo;) and it pushes the change over a live connection. So the hard part of push is already built; you just switch it on and listen.</p>
+    <div class="note"><strong>Decision: use Supabase realtime for the wall, keep polling as the fallback.</strong> Realtime is included, it's the nicer experience (a logged match pops onto the wall and the ELO animates within a second), and it's little more than &ldquo;subscribe to the tables, refetch on change.&rdquo; If realtime ever misbehaves, a 10-second poll of the same two operations is a couple of lines and an instant, no-drama fallback.</div>
+
+    <h2><span class="num">3</span>What actually updates &mdash; and how little code it is</h2>
+    <p>The wall already knows how to draw itself from <code>getLeaderboard</code> and <code>getFeed</code> (<a href="EF Pong Talking To It.dc.html">Step 3</a>). &ldquo;Live&rdquo; just means re-running those when the data behind them moves &mdash; the ranking re-orders, the ticker gains a match, biggest-mover and the champion update. Same reads, retriggered.</p>
+    <div class="flow">
+      <div class="fl"><span class="n">1</span>On load, the wall calls <span class="hi">getLeaderboard</span> + <span class="hi">getFeed</span> once and draws</div>
+      <div class="fl"><span class="n">2</span>It subscribes to changes on <span class="hi">match, standings, reaction, comment</span></div>
+      <div class="fl"><span class="n">3</span>Any change &rarr; refetch the affected view &amp; animate the diff <span class="cm">&mdash; new row slides in, ELO ticks</span></div>
+      <div class="fl"><span class="n">4</span>Fallback: if the connection drops, re-poll every 10s until it's back <span class="cm">&mdash; self-healing</span></div>
+    </div>
+
+    <h2><span class="num">4</span>Staying up for days unattended</h2>
+    <p>The PRD asks the wall to run for days without babysitting. Both approaches handle it, and it's worth being deliberate:</p>
+    <ul>
+      <li><strong>Auto-reconnect.</strong> Supabase's realtime client reconnects on its own after a network blip; a poller is inherently self-healing (the next tick just works). Either way, on reconnect the wall does a full refetch so it can never sit on stale data.</li>
+      <li><strong>Refresh on wake.</strong> If the screen or tab sleeps, refetch everything when it wakes &mdash; treat waking like a fresh load.</li>
+      <li><strong>No memory creep.</strong> The view redraws from fresh reads rather than piling up state, so a screen left on all quarter stays healthy.</li>
+    </ul>
+
+    <h2><span class="num">5</span>That's the whole backend spec</h2>
+    <div class="done">
+      <p style="margin:0 0 6px"><strong>Seven steps, done.</strong> The design is settled end to end: the <a href="EF Pong Data Model.dc.html">seven tables</a>, on <a href="EF Pong Where Data Lives.dc.html">Supabase</a>, behind a <a href="EF Pong Talking To It.dc.html">ten-operation API with server-side ELO</a>, with the <a href="EF Pong Hosting And Cost.dc.html">frontend on GitHub Pages</a>, a phased <a href="EF Pong The Auth Path.dc.html">auth path</a>, safe <a href="EF Pong Admin And Corrections.dc.html">admin corrections</a>, and a live wall. No open questions remain &mdash; time to build.</p>
+    </div>
+    <h3>Build order, once you're ready</h3>
+    <ol>
+      <li>Create the Supabase project &rarr; recreate the seven tables from Step 1 in its table editor.</li>
+      <li>Seed ~40 real players and open the first season.</li>
+      <li>Point the prototype's data layer at Supabase (shapes already match) &mdash; swap in-memory for API calls.</li>
+      <li>Move the ELO math into the <code>logMatch</code> database function; add <code>rollSeason</code> and <code>correctMatch</code>.</li>
+      <li>Turn on realtime for the wall; publish the frontend to GitHub Pages.</li>
+    </ol>
+    <p style="font-size:13px;color:rgba(25,25,25,.6)">An easy first checkpoint: get just <code>players</code> reading live end-to-end &mdash; it proves the whole GitHub Pages &harr; Supabase path in one small, satisfying step.</p>
+
+    <p style="margin-top:28px;padding-top:16px;border-top:2px solid #191919;font-size:13px;color:rgba(25,25,25,.55)">Step 7 of 7 &middot; End of the backend walkthrough. The spec is complete; the next move is building it.</p>
+  </div>
+</x-import>
+</x-dc>
+</body>
+</html>

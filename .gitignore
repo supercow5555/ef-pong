@@ -1,0 +1,10 @@
+node_modules/
+*.otf
+*.ttf
+*.woff
+*.woff2
+.env
+.env.local
+.claude/
+dist/
+.DS_Store
