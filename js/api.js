@@ -171,6 +171,19 @@ export function onAuthChange(cb) {
   return data.subscription;
 }
 
+// OAuth sign-in (google / azure / …). Redirects the browser to the provider
+// and back; onAuthChange picks up the established session on return.
+export async function signInWithProvider(provider) {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: window.location.origin + window.location.pathname,
+      scopes: provider === 'azure' ? 'openid profile email' : undefined,
+    },
+  });
+  if (error) throw error;
+}
+
 export async function sendMagicLink(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim(),

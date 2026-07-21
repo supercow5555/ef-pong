@@ -1,7 +1,13 @@
 // EF Pong — phone app. Faithful port of the trust-wave prototype, wired to Supabase.
 // Trust wave (wave 1): magic-link login, match ownership, dispute → admin, claims.
 import * as api from './api.js';
-import { SUPABASE_ANON_KEY } from './config.js';
+import { SUPABASE_ANON_KEY, AUTH_PROVIDERS } from './config.js';
+
+// provider button metadata (label + Phosphor icon + brand color)
+const PROVIDER_META = {
+  google: { label: 'Continue with Google', icon: 'ph-google-logo', color: '#191919' },
+  azure: { label: 'Continue with Microsoft', icon: 'ph-windows-logo', color: '#0067b8' },
+};
 
 // ---------- state ----------
 const state = {
@@ -647,7 +653,7 @@ function renderGate() {
   const [ncBg, ncText] = PAL[state.players.length % PAL.length];
 
   const titles = {
-    email: ['Sign in to EF Pong', "Enter your work email once — we'll send a magic link. No password. Come back with the same email and you're straight in."],
+    email: ['Sign in to EF Pong', 'One tap to sign in — no password. New here? You’ll pick your name next.'],
     sent: ['Check your email', 'Open the link we just sent to finish signing in on this device.'],
     claim: state.rolloutComplete
       ? ['Add yourself', 'Everyone’s onboarded, so new sign-ins create a new player. An admin approves you before you can log or dispute.']
@@ -663,13 +669,19 @@ function renderGate() {
 
   let body = '';
   if (step === 'email') {
-    body = `
-    <div style="background:#fff;border:1.5px solid rgba(0,107,214,.25);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;gap:12px">
-      <label style="font-size:12px;font-weight:700;color:#191919">Work email</label>
-      <input id="auth-email" value="${esc(state.authEmail)}" type="email" placeholder="you@ef.com" autocomplete="email" style="width:100%;height:48px;border:1.5px solid rgba(25,25,25,.15);border-radius:12px;padding:0 14px;font-size:16px;font-weight:500;color:#191919;outline:none" />
-      <button class="tap" data-action="send-link" ${emailOk && !state.busy ? '' : 'disabled'} style="width:100%;height:48px;border:none;border-radius:999px;background:${emailOk && !state.busy ? '#006BD6' : 'rgba(25,25,25,.2)'};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-paper-plane-tilt" style="font-size:18px"></i>${state.busy ? 'Sending…' : 'Send magic link'}</button>
-      <p style="margin:0;font-size:11.5px;color:rgba(25,25,25,.45);font-weight:300;text-align:center">One email, once — no password. Next you'll pick your name, or add one if you're new.</p>
-    </div>`;
+    const oauthProviders = AUTH_PROVIDERS.filter(p => p !== 'email');
+    const providerBtns = oauthProviders.map(p => {
+      const m = PROVIDER_META[p] || { label: 'Continue with ' + p, icon: 'ph-sign-in', color: '#191919' };
+      return `<button class="tap" data-action="oauth" data-provider="${p}" ${state.busy ? 'disabled' : ''} style="width:100%;height:52px;border:1.5px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:10px;color:#191919;font-size:15px;font-weight:700"><i class="ph-bold ${m.icon}" style="font-size:20px;color:${m.color}"></i>${m.label}</button>`;
+    }).join('');
+    const emailFallback = AUTH_PROVIDERS.includes('email') ? `
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0"><div style="flex:1;height:1px;background:rgba(25,25,25,.12)"></div><span style="font-size:11px;font-weight:700;color:rgba(25,25,25,.4);text-transform:uppercase;letter-spacing:.5px">or use email</span><div style="flex:1;height:1px;background:rgba(25,25,25,.12)"></div></div>
+      <div style="background:#fff;border:1.5px solid rgba(25,25,25,.12);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px">
+        <input id="auth-email" value="${esc(state.authEmail)}" type="email" placeholder="you@example.com" autocomplete="email" style="width:100%;height:48px;border:1.5px solid rgba(25,25,25,.15);border-radius:12px;padding:0 14px;font-size:16px;font-weight:500;color:#191919;outline:none" />
+        <button class="tap" data-action="send-link" ${emailOk && !state.busy ? '' : 'disabled'} style="width:100%;height:48px;border:none;border-radius:999px;background:${emailOk && !state.busy ? '#006BD6' : 'rgba(25,25,25,.2)'};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-paper-plane-tilt" style="font-size:18px"></i>${state.busy ? 'Sending…' : 'Send magic link'}</button>
+        <p style="margin:0;font-size:11px;color:rgba(25,25,25,.45);font-weight:300;text-align:center">Magic-link email can be slow to arrive — the buttons above are faster.</p>
+      </div>` : '';
+    body = providerBtns + emailFallback;
   } else if (step === 'sent') {
     body = `
     <div style="background:#fff;border:1.5px solid rgba(0,107,214,.25);border-radius:16px;padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
@@ -895,6 +907,18 @@ const actions = {
       showToast('Could not send the link — try again');
       console.error(err);
     } finally { state.busy = false; render(); }
+  },
+  'oauth': async el => {
+    if (state.busy) return;
+    state.busy = true; render();
+    try {
+      await api.signInWithProvider(el.dataset.provider);   // redirects away on success
+    } catch (err) {
+      state.busy = false;
+      showToast(err.message || 'Sign-in failed — is this provider enabled?');
+      console.error(err);
+      render();
+    }
   },
   'change-email': () => { state.authStep = 'email'; render(); },
   'open-create': () => { state.creating = true; state._newName = ''; render(); },
