@@ -41,8 +41,11 @@ button:disabled{cursor:default}
 .tap{transition:transform .12s var(--ease), background .15s var(--ease), box-shadow .15s var(--ease)}
 .tap:active{transform:scale(.97)}
 
-/* phone-first app shell, centered column on desktop */
-#app{max-width:480px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;background:var(--gray-100);position:relative;box-shadow:0 0 40px -20px rgba(25,25,25,.3)}
-#view{flex:1;overflow-y:auto;overflow-x:hidden}
+/* phone-first app shell, centered column on desktop.
+   height (not min-height) pins the column to the viewport so the header and
+   nav stay put and only #view scrolls. dvh tracks the live viewport as mobile
+   browser chrome collapses/expands; vh is the fallback for older browsers. */
+#app{max-width:480px;margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--gray-100);position:relative;box-shadow:0 0 40px -20px rgba(25,25,25,.3)}
+#view{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 
 .hidden{display:none !important}
