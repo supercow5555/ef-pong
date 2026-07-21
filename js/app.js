@@ -9,6 +9,14 @@ const PROVIDER_META = {
   azure: { label: 'Continue with Microsoft', icon: 'ph-windows-logo', color: '#0067b8' },
 };
 
+// feed reactions, in display order. Keys must match the reaction_type enum
+// in the database (see supabase/migration_feed_reactions.sql for the 4 new ones).
+const REACTIONS = [
+  { key: 'fire', emoji: '🔥' }, { key: 'wow', emoji: '😮' }, { key: 'gg', emoji: '🤝' },
+  { key: 'lol', emoji: '😂' }, { key: 'angry', emoji: '😠' }, { key: 'rage', emoji: '🤬' },
+  { key: 'poop', emoji: '💩' },
+];
+
 // ---------- state ----------
 const state = {
   season: null,
@@ -46,6 +54,11 @@ const state = {
   scoreA: 11,
   scoreB: 0,
   openComments: new Set(),
+
+  // feed redesign
+  feedFilter: 'all',    // 'all' | 'mine' | <playerId>
+  byPlayerRowOpen: false,
+  openPicker: null,     // matchId whose emoji strip is open, or null
 
   toast: null,
   loading: true,
@@ -531,15 +544,18 @@ function ratingNotes() {
 
 // ---------- feed ----------
 function viewFeed() {
-  const head = `
-    <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0 0 2px;letter-spacing:-.5px">Match feed</h1>
-    <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Every game, live. React and talk trash.</p>`;
+  const title = `
+    <div style="padding:16px 16px 2px">
+      <h1 style="font-size:26px;font-weight:700;color:#191919;margin:0;letter-spacing:-.5px">Match feed</h1>
+      <p style="margin:2px 0 0;font-size:12px;color:rgba(25,25,25,.5);font-weight:300">Every game, live. React and talk trash.</p>
+    </div>`;
 
   if (!state.feed.length) {
     return `
-    <div style="padding:20px 16px 28px">
-      ${head}
-      <div style="text-align:center;padding:40px 22px;background:#fff;border:1px solid var(--hairline);border-radius:16px">
+    <div style="padding:0 0 28px">
+      ${title}
+      ${ratingNotes() ? `<div style="padding:12px 16px 0">${ratingNotes()}</div>` : ''}
+      <div style="margin:16px 16px 0;text-align:center;padding:40px 22px;background:#fff;border:1px solid var(--hairline);border-radius:16px">
         <div style="width:56px;height:56px;border-radius:16px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i class="ph ph-ping-pong" style="color:rgba(25,25,25,.35);font-size:30px"></i></div>
         <div style="font-size:16px;font-weight:700;color:#191919">No matches yet</div>
         <div style="font-size:13px;color:rgba(25,25,25,.55);font-weight:300;margin-top:4px">Play a game, then log it &mdash; it'll show up here for everyone to react to.</div>
@@ -547,12 +563,60 @@ function viewFeed() {
     </div>`;
   }
 
-  const cards = state.feed.map(m => {
+  const filter = state.feedFilter || 'all';
+  const byPlayer = filter !== 'all' && filter !== 'mine';
+
+  // ---- filter chips ----
+  const chip = (f, label, extra = '') => {
+    const active = f === 'byplayer' ? (state.byPlayerRowOpen || byPlayer) : filter === f;
+    return `<button class="tap" data-action="${f === 'byplayer' ? 'toggle-byplayer' : 'set-filter'}" ${f === 'byplayer' ? '' : `data-f="${f}"`} style="height:34px;padding:0 15px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:6px;border:1px solid ${active ? '#006BD6' : 'rgba(25,25,25,.15)'};background:${active ? '#006BD6' : '#fff'};color:${active ? '#fff' : '#191919'}">${label}${extra}</button>`;
+  };
+  const chips = chip('all', 'All') + chip('mine', 'My matches')
+    + chip('byplayer', 'By player', '<i class="ph-bold ph-caret-down" style="font-size:13px"></i>');
+
+  // ---- by-player avatar row (distinct feed participants, excluding you) ----
+  const seen = new Set(); const participants = [];
+  state.feed.forEach(m => [m.winner, m.loser].forEach(pl => {
+    if (pl.id !== state.identity && !seen.has(pl.id)) { seen.add(pl.id); participants.push(pl); }
+  }));
+  const byPlayerRow = state.byPlayerRowOpen ? `
+    <div class="app-scroll" style="display:flex;gap:12px;overflow-x:auto;padding:12px 2px 4px;animation:popIn .16s ease">
+      ${participants.map(pl => {
+        const ring = filter === pl.id ? '#006BD6' : 'transparent';
+        return `<button class="tap" data-action="filter-player" data-id="${esc(pl.id)}" style="width:52px;flex-shrink:0;border:none;background:transparent;padding:0;display:flex;flex-direction:column;align-items:center;gap:5px">
+          <div style="width:46px;height:46px;border-radius:999px;background:${pl.avatar_color};color:${api.textColorFor(pl.avatar_color)};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;border:3px solid ${ring}">${esc(pl.initials)}</div>
+          <span style="font-size:11px;font-weight:700;color:#191919;max-width:52px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(first(pl.name))}</span>
+        </button>`;
+      }).join('')}
+    </div>` : '';
+
+  // ---- active-player banner ----
+  const fp = byPlayer ? P(filter) : null;
+  const banner = fp ? `
+    <div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid rgba(0,107,214,.25);border-radius:999px;height:34px;padding:0 6px 0 14px;animation:popIn .16s ease">
+      <i class="ph-fill ph-funnel" style="color:#006BD6;font-size:14px"></i>
+      <span style="flex:1;font-size:13px;font-weight:700;color:#191919">Showing ${esc(first(fp.name))}'s matches</span>
+      <button class="tap" data-action="clear-filter" title="Clear filter" style="width:24px;height:24px;border-radius:999px;border:none;background:#F0F0F0;color:rgba(25,25,25,.6);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-x" style="font-size:12px"></i></button>
+    </div>` : '';
+
+  const filterBar = `
+    <div style="position:sticky;top:0;z-index:10;padding:10px 16px 8px;background:linear-gradient(#F5F5F5 78%, rgba(245,245,245,0))">
+      <div style="display:flex;gap:8px">${chips}</div>
+      ${byPlayerRow}
+      ${banner}
+    </div>`;
+
+  // ---- filtered matches ----
+  const matches = state.feed.filter(m => {
+    if (filter === 'all') return true;
+    if (filter === 'mine') return state.identity && (m.winnerId === state.identity || m.loserId === state.identity);
+    return m.winnerId === filter || m.loserId === filter;
+  });
+
+  const cardOf = m => {
     const open = state.openComments.has(m.id);
     const disputed = m.status === 'disputed' && !m.isVoided;
     const voided = m.isVoided;
-    const rBtn = (kind, glyph, n) => `
-      <button class="tap" data-action="react" data-id="${esc(m.id)}" data-kind="${kind}" style="border:1px solid ${n > 0 ? 'rgba(0,107,214,.3)' : 'rgba(25,25,25,.12)'};background:${n > 0 ? 'rgba(0,107,214,.08)' : '#fff'};border-radius:999px;height:30px;padding:0 10px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:#191919"><span>${glyph}</span>${n}</button>`;
     const W = m.winner, L = m.loser;
     const wc = api.textColorFor(W.avatar_color), lc = api.textColorFor(L.avatar_color);
     const comments = m.comments.map(c => `
@@ -560,27 +624,43 @@ function viewFeed() {
         <div style="width:24px;height:24px;border-radius:999px;background:${c.author ? c.author.avatar_color : '#999'};color:${c.author ? api.textColorFor(c.author.avatar_color) : '#fff'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:9px;flex-shrink:0;margin-top:1px">${c.author ? esc(c.author.initials) : '?'}</div>
         <div style="background:#F5F5F5;border-radius:12px;padding:7px 11px"><span style="font-size:12px;font-weight:700;color:#191919">${c.author ? esc(first(c.author.name)) : '?'}</span> <span style="font-size:12px;color:#191919;font-weight:300">${esc(c.text)}</span></div>
       </div>`).join('');
+
+    const pills = REACTIONS.filter(r => (m.reactions[r.key] || 0) > 0).map(r => `
+      <button class="tap" data-action="react" data-id="${esc(m.id)}" data-kind="${r.key}" style="height:30px;padding:0 10px;border:1px solid rgba(0,107,214,.28);background:rgba(0,107,214,.07);border-radius:999px;flex-shrink:0;display:flex;align-items:center;gap:5px"><span style="font-size:14px">${r.emoji}</span><span style="font-size:13px;font-weight:700;color:#191919">${m.reactions[r.key]}</span></button>`).join('');
+    const addBtn = `<button class="tap" data-action="toggle-reactions" data-id="${esc(m.id)}" title="Add reaction" style="width:30px;height:30px;border-radius:999px;background:#fff;border:1px solid rgba(25,25,25,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-smiley-sticker" style="font-size:15px;color:rgba(25,25,25,.6)"></i></button>`;
+    const pickerStrip = state.openPicker === m.id ? `
+      <div class="app-scroll" style="position:absolute;bottom:44px;left:0;z-index:30;background:#fff;border:1px solid rgba(25,25,25,.1);border-radius:999px;box-shadow:0 14px 34px -10px rgba(25,25,25,.4);padding:5px 6px;display:flex;gap:2px;overflow-x:auto;max-width:100%;animation:fcPop .16s cubic-bezier(0.45,0.05,0.12,0.88)">
+        ${REACTIONS.map(r => `<button class="tap fc-emoji" data-action="pick-reaction" data-id="${esc(m.id)}" data-kind="${r.key}" style="width:38px;height:38px;border-radius:999px;border:none;background:transparent;font-size:21px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${r.emoji}</button>`).join('')}
+      </div>` : '';
+
+    // winner/loser blocks are tappable → filter feed to that player
+    const winnerBlock = `
+      <button class="tap" data-action="filter-player" data-id="${esc(W.id)}" style="border:none;background:transparent;padding:0;display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left">
+        <div style="width:40px;height:40px;border-radius:999px;background:${W.avatar_color};color:${wc};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;position:relative;flex-shrink:0">${esc(W.initials)}<i class="ph-fill ph-crown-simple" style="position:absolute;top:-9px;right:-6px;color:#FAB005;font-size:15px;transform:rotate(18deg)"></i></div>
+        <div style="min-width:0"><div style="font-size:14px;font-weight:700;color:#191919;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(first(W.name))}</div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#008928">+${m.delta}</div></div>
+      </button>`;
+    const loserBlock = `
+      <button class="tap" data-action="filter-player" data-id="${esc(L.id)}" style="border:none;background:transparent;padding:0;display:flex;align-items:center;gap:10px;flex:1;min-width:0;justify-content:flex-end;text-align:right">
+        <div style="min-width:0"><div style="font-size:14px;font-weight:700;color:#191919;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(first(L.name))}</div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#D1334A">&minus;${m.delta}</div></div>
+        <div style="width:40px;height:40px;border-radius:999px;background:${L.avatar_color};color:${lc};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${esc(L.initials)}</div>
+      </button>`;
+
     return `
     <div style="background:#fff;border:1px solid var(--hairline);border-radius:16px;overflow:hidden;box-shadow:0 6px 18px -14px rgba(25,25,25,.4)">
       ${m.upset && !disputed && !voided ? '<div style="background:#DA2381;color:#fff;font-size:11px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;padding:5px 16px;display:flex;align-items:center;gap:6px"><i class="ph-fill ph-lightning"></i>Upset of the day</div>' : ''}
       ${disputed ? '<div style="background:#FFF7E0;color:#946A00;font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;padding:6px 16px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #F2C94C"><i class="ph-fill ph-warning"></i>Disputed &middot; with the admin</div>' : ''}
       ${voided ? '<div style="background:#F0F0F0;color:rgba(25,25,25,.55);font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;padding:6px 16px;display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(25,25,25,.12)"><i class="ph-fill ph-prohibit"></i>Voided by admin &middot; no ELO</div>' : ''}
       <div style="padding:14px 16px 12px;opacity:${voided ? '.5' : '1'}">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:10px;flex:1">
-            <div style="width:40px;height:40px;border-radius:999px;background:${W.avatar_color};color:${wc};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;position:relative">${esc(W.initials)}<i class="ph-fill ph-crown-simple" style="position:absolute;top:-9px;right:-6px;color:#FAB005;font-size:15px;transform:rotate(18deg)"></i></div>
-            <div><div style="font-size:14px;font-weight:700;color:#191919;line-height:1.1">${esc(first(W.name))}</div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#008928">+${m.delta}</div></div>
-          </div>
-          <div style="text-align:center;padding:0 6px"><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#191919;line-height:1">${m.winnerScore}&ndash;${m.loserScore}</div><div style="font-size:10px;color:rgba(25,25,25,.4);font-weight:700;letter-spacing:.5px">${fmtTime(m.playedAt)}</div></div>
-          <div style="display:flex;align-items:center;gap:10px;flex:1;justify-content:flex-end;text-align:right">
-            <div><div style="font-size:14px;font-weight:700;color:#191919;line-height:1.1">${esc(first(L.name))}</div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#D1334A">&minus;${m.delta}</div></div>
-            <div style="width:40px;height:40px;border-radius:999px;background:${L.avatar_color};color:${lc};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px">${esc(L.initials)}</div>
-          </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
+          ${winnerBlock}
+          <div style="text-align:center;padding:0 6px;flex-shrink:0"><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#191919;line-height:1">${m.winnerScore}&ndash;${m.loserScore}</div><div style="font-size:10px;color:rgba(25,25,25,.4);font-weight:700;letter-spacing:.5px">${fmtTime(m.playedAt)}</div></div>
+          ${loserBlock}
         </div>
-        <div style="display:flex;align-items:center;gap:8px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px">
-          ${rBtn('fire', '🔥', m.reactions.fire)}${rBtn('wow', '😮', m.reactions.wow)}${rBtn('gg', '🤝', m.reactions.gg)}
-          <button class="tap" data-action="toggle-comments" data-id="${esc(m.id)}" style="margin-left:auto;border:none;background:transparent;display:flex;align-items:center;gap:5px;color:rgba(25,25,25,.55);font-size:13px;font-weight:700"><i class="ph-bold ph-chat-circle" style="font-size:16px"></i>${m.comments.length}</button>
-          <button class="tap" data-action="open-dispute" data-id="${esc(m.id)}" title="Match options" style="border:none;background:transparent;width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:rgba(25,25,25,.4)"><i class="ph-bold ph-dots-three-outline" style="font-size:16px"></i></button>
+        <div style="position:relative;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px">
+          <div class="app-scroll" style="flex:1;min-width:0;overflow-x:auto;display:flex;gap:6px">${pills}${addBtn}</div>
+          <button class="tap" data-action="toggle-comments" data-id="${esc(m.id)}" style="flex-shrink:0;border:none;background:transparent;display:flex;align-items:center;gap:5px;color:rgba(25,25,25,.55);font-size:13px;font-weight:700"><i class="ph-bold ph-chat-circle" style="font-size:16px"></i>${m.comments.length}</button>
+          <button class="tap" data-action="open-dispute" data-id="${esc(m.id)}" title="Match options" style="flex-shrink:0;border:none;background:transparent;width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:rgba(25,25,25,.4)"><i class="ph-bold ph-dots-three-outline" style="font-size:16px"></i></button>
+          ${pickerStrip}
         </div>
         ${open ? `
         <div style="margin-top:10px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px;display:flex;flex-direction:column;gap:8px">
@@ -594,13 +674,18 @@ function viewFeed() {
         </div>` : ''}
       </div>
     </div>`;
-  }).join('');
+  };
+
+  const list = matches.length
+    ? `<div style="display:flex;flex-direction:column;gap:14px;padding:4px 16px 26px">${matches.map(cardOf).join('')}</div>`
+    : `<div style="margin:4px 16px 26px;text-align:center;background:#fff;border:1px solid rgba(25,25,25,.08);border-radius:16px;padding:34px 20px;font-size:13px;font-weight:300;color:rgba(25,25,25,.55)">No matches for this filter yet.</div>`;
 
   return `
-  <div style="padding:20px 16px 28px">
-    ${head}
-    ${ratingNotes()}
-    <div style="display:flex;flex-direction:column;gap:14px">${cards}</div>
+  <div style="padding:0 0 4px">
+    ${title}
+    ${ratingNotes() ? `<div style="padding:12px 16px 0">${ratingNotes()}</div>` : ''}
+    ${filterBar}
+    ${list}
   </div>`;
 }
 
@@ -1060,6 +1145,8 @@ const actions = {
     if (s === 'profile') { openProfile(state.identity); return; }
     state.screen = s;
     state.pickerOpen = null;
+    state.openPicker = null;
+    state.byPlayerRowOpen = false;
     render();
   },
   'open-profile': el => openProfile(el.dataset.id),
@@ -1182,12 +1269,14 @@ const actions = {
       console.error(err);
     } finally { state.busy = false; render(); }
   },
-  'react': async el => {
-    const { id, kind } = el.dataset;
-    const m = state.feed.find(x => x.id === id);
-    if (m) { m.reactions[kind]++; render(); }
-    try { await api.addReaction(id, kind); } catch (err) { console.error(err); }
-  },
+  // ---- feed filters + reactions ----
+  'set-filter': el => { state.feedFilter = el.dataset.f; state.byPlayerRowOpen = false; state.openPicker = null; render(); },
+  'toggle-byplayer': () => { state.byPlayerRowOpen = !state.byPlayerRowOpen; state.openPicker = null; render(); },
+  'filter-player': el => { state.feedFilter = el.dataset.id; state.byPlayerRowOpen = false; state.openPicker = null; render(); },
+  'clear-filter': () => { state.feedFilter = 'all'; state.byPlayerRowOpen = false; render(); },
+  'toggle-reactions': el => { state.openPicker = state.openPicker === el.dataset.id ? null : el.dataset.id; render(); },
+  'react': el => { applyReaction(el.dataset.id, el.dataset.kind); render(); },
+  'pick-reaction': el => { state.openPicker = null; applyReaction(el.dataset.id, el.dataset.kind); render(); },
   'toggle-comments': el => {
     const id = el.dataset.id;
     state.openComments.has(id) ? state.openComments.delete(id) : state.openComments.add(id);
@@ -1295,6 +1384,15 @@ const actions = {
     } finally { state.busy = false; render(); }
   },
 };
+
+// Optimistic reaction bump, then persist. New keys (lol/angry/rage/poop) need
+// the reaction_type enum migration; without it the insert errors and the count
+// reverts on the next refresh (the 3 original keys work regardless).
+async function applyReaction(id, kind) {
+  const m = state.feed.find(x => x.id === id);
+  if (m) m.reactions[kind] = (m.reactions[kind] || 0) + 1;
+  try { await api.addReaction(id, kind); } catch (err) { console.error(err); }
+}
 
 async function openProfile(id) {
   state.avatarMenu = false;

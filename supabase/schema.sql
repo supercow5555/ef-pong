@@ -7,7 +7,7 @@ create extension if not exists pgcrypto;
 -- 'confirmed' is the live / "counting" state (ELO applies on entry); trust wave
 -- flips it to 'disputed' and back. See supabase/migrations/001_trust_wave.sql.
 create type match_status as enum ('confirmed', 'pending', 'disputed');
-create type reaction_type as enum ('fire', 'wow', 'gg');
+create type reaction_type as enum ('fire', 'wow', 'gg', 'lol', 'angry', 'rage', 'poop');
 create type dispute_reason as enum ('score', 'nothappen', 'wrongplayer', 'other');
 create type rh_kind as enum ('match', 'void', 'penalty');
 

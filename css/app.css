@@ -37,6 +37,9 @@ button:disabled{cursor:default}
 @keyframes popIn{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes toastIn{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 @keyframes tickerRow{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* feed emoji-picker strip entrance */
+@keyframes fcPop{from{transform:translateY(6px) scale(.96);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+.fc-emoji:hover{background:#F0F3F7}
 
 .tap{transition:transform .12s var(--ease), background .15s var(--ease), box-shadow .15s var(--ease)}
 .tap:active{transform:scale(.97)}
