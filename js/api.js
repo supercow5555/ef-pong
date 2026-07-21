@@ -119,6 +119,18 @@ export async function getPlayerDetail(playerId, seasonId) {
   };
 }
 
+// The signed-in user's own matches (winner/loser ids + when), most-recent first.
+// Drives the log-a-match opponent picker: recent opponents and "n games together".
+export async function getPlayerMatches(playerId, seasonId) {
+  const { data, error } = await supabase.from('match')
+    .select('winner_id, loser_id, played_at')
+    .eq('season_id', seasonId).eq('is_voided', false)
+    .or(`winner_id.eq.${playerId},loser_id.eq.${playerId}`)
+    .order('played_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function logMatch({ winnerId, loserId, winnerScore, loserScore, enteredBy }) {
   const { data, error } = await supabase.rpc('log_match', {
     p_winner_id: winnerId, p_loser_id: loserId,
