@@ -8,8 +8,9 @@ Always-on ELO leaderboard for office ping pong. Static frontend (GitHub Pages) +
 - `wall.html` + `js/wall.js` — the office wall display (realtime, 10s polling fallback)
 - `js/api.js` — data layer (the ten API operations)
 - `js/config.js` — Supabase project URL + anon key
-- `supabase/schema.sql` — the seven tables + RLS + realtime publication
-- `supabase/functions.sql` — `log_match` (server-side ELO), `correct_match` (void/edit + full-season replay), `roll_season`
+- `supabase/schema.sql` — the tables + RLS + realtime publication (includes trust-wave columns for fresh installs)
+- `supabase/functions.sql` — `log_match` (server-side ELO), `correct_match` (void/edit + full-season replay), `roll_season`, plus the trust-wave functions (`dispute_match`, `resolve_dispute`, `approve_claim`/`reject_claim`, …)
+- `supabase/migrations/001_trust_wave.sql` — additive migration that upgrades a **live** MVP database to the trust wave (run once)
 - `supabase/seed.sql` — opens the first season
 
 ## Setup (once)
@@ -36,8 +37,48 @@ select correct_match('<admin secret>', '<match id>', 'edit', null, null, 11, 7);
 select roll_season('<admin secret>', '2026-q4', 'Q4 2026');
 ```
 
-## Auth phases
+## Trust wave (wave 1: trust & identity)
 
-Launch = Phase 1 (pick your name, honour system). Phase 2 (magic-link) and Phase 3 (EF SSO) are config upgrades — see the handoff docs; no schema changes needed.
+Adds magic-link login, match ownership, disputes → an admin queue, and a
+claim-your-name onboarding gate. The rules live in
+[`design_handoff_ef_pong/`](design_handoff_ef_pong/) and the build brief in the
+trust-wave handoff bundle. Key rule: **voiding a disputed match uses localized
+reversal** — only the two players move, no season replay.
+
+### Deploying it to the live DB (once)
+
+1. **Migration.** In the Supabase SQL editor run `supabase/migrations/001_trust_wave.sql`,
+   then re-run `supabase/functions.sql` (adds the new functions + the auth guard
+   on `log_match`). Fresh installs can just run the updated `schema.sql` +
+   `functions.sql` and skip the migration.
+2. **Enable magic-link auth.** Supabase → Authentication → Providers → Email:
+   turn on “Email” / magic link. Add the site URL and the GitHub Pages URL to
+   Authentication → URL Configuration (Site URL + Redirect URLs) so the link
+   returns to the app.
+3. **Make yourself admin** (DB only — never grantable from the client). After you
+   sign in once and are approved so your email is bound:
+   ```sql
+   update player set is_admin = true where email = '<you>@ef.com';
+   ```
+   Or bind + promote in one go before first sign-in:
+   ```sql
+   update player set email = '<you>@ef.com', is_admin = true where id = '<your player id>';
+   ```
+4. **Flip rollout when everyone's onboarded** — from the app's Admin tab
+   (Rollout toggle), or `select set_rollout_complete(true);` as an admin.
+
+### How it works
+
+- **Recognised email** (bound to a player) signs straight in. A **new email**
+  claims an unclaimed roster name or creates a new player → lands **pending**
+  (browse only) until an admin approves, which binds the email.
+- **`log_match` / `dispute_match` / commenting** require a verified caller
+  (email bound) and, for logging/disputing, that you're a participant — enforced
+  in the functions, not just the UI. Reactions and viewing stay open.
+- **Dispute** flags a match (`confirmed` → `disputed`) and routes to the admin;
+  it changes no rating on its own. The admin **upholds** (→ `confirmed`),
+  **voids** (localized reversal), or **voids + penalises** (flat −50 on the
+  offender, logged in `rating_history` as `kind='penalty'`).
+- `correct_match` / `replay_season` remain the rare full-replay escape hatch.
 
 Note: EF Circular font files are licensed and not committed; the app falls back to system fonts where they're unavailable.

@@ -1,17 +1,34 @@
-// EF Pong — phone app. Faithful port of the design prototype, wired to Supabase.
+// EF Pong — phone app. Faithful port of the trust-wave prototype, wired to Supabase.
+// Trust wave (wave 1): magic-link login, match ownership, dispute → admin, claims.
 import * as api from './api.js';
 import { SUPABASE_ANON_KEY } from './config.js';
 
 // ---------- state ----------
 const state = {
   season: null,
-  players: [],          // leaderboard rows, sorted by elo desc
+  players: [],          // leaderboard rows, sorted by elo desc (incl. email, isAdmin)
   history: [],          // rating_history rows (move indicators)
   feed: [],
+  claims: [],           // sign-ins awaiting admin approval
+  ratingEvents: [],     // void/penalty events affecting me (ratings-changed notes)
+  rolloutComplete: false,
   screen: 'leaderboard',
-  identity: null,
-  switching: false,
-  creating: false,
+
+  // identity / auth
+  session: null,
+  identity: null,       // signed-in player id
+  pending: false,       // signed in, but player has no bound email / an open claim
+  authStep: 'email',    // 'email' | 'sent' | 'claim'
+  authEmail: '',
+  creating: false,      // create-player form open in the claim step
+  _newName: '',
+  avatarMenu: false,
+
+  // dispute sheet
+  disputeFor: null,     // match id whose sheet is open
+  disputeReason: null,  // 'score' | 'nothappen' | 'wrongplayer' | 'other'
+
+  // log tab
   profileId: null,
   profileData: null,
   rivalId: null,
@@ -21,13 +38,19 @@ const state = {
   scoreA: 11,
   scoreB: 0,
   openComments: new Set(),
+
   toast: null,
   loading: true,
   error: null,
   busy: false,
 };
 
-try { state.identity = localStorage.getItem('efpong_identity'); } catch (e) {}
+let seenEvents = new Set();
+try { seenEvents = new Set(JSON.parse(localStorage.getItem('efpong_seen_events') || '[]')); } catch (e) {}
+function markEventSeen(id) {
+  seenEvents.add(id);
+  try { localStorage.setItem('efpong_seen_events', JSON.stringify([...seenEvents])); } catch (e) {}
+}
 
 // ---------- elo (preview only — the server is authoritative) ----------
 const expected = (a, b) => 1 / (1 + Math.pow(10, (b - a) / 400));
@@ -48,12 +71,26 @@ const first = name => (name || '').split(' ')[0];
 const P = id => state.players.find(p => p.id === id);
 const rankOf = id => state.players.findIndex(p => p.id === id) + 1;
 const games = p => p.wins + p.losses;
+const emailValid = e => /\S+@\S+\.\S+/.test((e || '').trim());
+const me = () => (state.identity ? P(state.identity) : null);
+const isAdmin = () => { const m = me(); return !!(m && m.isAdmin); };
+const canAct = () => !!(state.identity && !state.pending);
+// roster names a newcomer may claim: no email bound, no open claim, not the admin
+const claimable = () => state.players.filter(p =>
+  !p.email && !p.isAdmin && !state.claims.some(c => c.player_id === p.id));
 
 function fmtTime(iso) {
   const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
   if (min < 60) return min + 'm ago';
   if (min < 1440) return Math.round(min / 60) + 'h ago';
   return Math.round(min / 1440) + 'd ago';
+}
+
+function mkInitials(name) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 // elo 24h ago from the audit trail -> today's movement
@@ -81,26 +118,58 @@ const avatar = (p, size, font) => `
 async function loadCore() {
   state.season = await api.getActiveSeason();
   await refreshData();
-  if (state.identity && !P(state.identity)) {
-    state.identity = null;
-    try { localStorage.removeItem('efpong_identity'); } catch (e) {}
-  }
-  if (state.identity && !state.logA) state.logA = state.identity;
   state.loading = false;
 }
 
 async function refreshData() {
-  const [players, feed, history] = await Promise.all([
+  const [players, feed, history, claims, rollout] = await Promise.all([
     api.getLeaderboard(state.season.id),
-    api.getFeed(state.season.id),
+    api.getFeed(state.season.id, 30, { includeVoided: true }),
     api.supabase.from('rating_history')
-      .select('player_id, rating_after, recorded_at')
+      .select('player_id, rating_after, recorded_at, kind')
       .order('recorded_at', { ascending: true }).limit(5000)
       .then(r => { if (r.error) throw r.error; return r.data; }),
+    api.listClaims().catch(() => []),
+    api.getRolloutComplete().catch(() => false),
   ]);
   state.players = players;
   state.feed = feed;
   state.history = history;
+  state.claims = claims;
+  state.rolloutComplete = rollout;
+  if (state.identity && !P(state.identity)) state.identity = null;
+  // verified iff the player row has a bound email — auto-flips when an admin approves
+  if (state.identity) state.pending = !(P(state.identity) && P(state.identity).email);
+  if (canAct() && !state.logA) state.logA = state.identity;
+  if (state.identity) {
+    state.ratingEvents = await api.getRatingEvents(state.identity).catch(() => []);
+  }
+}
+
+// Resolve the current Supabase session into an app identity.
+async function resolveSession(session) {
+  state.session = session;
+  if (!session) {
+    state.identity = null; state.pending = false;
+    state.authStep = 'email';
+    return;
+  }
+  const email = (session.user && session.user.email) || '';
+  state.authEmail = email;
+  const player = await api.resolvePlayerByEmail(email).catch(() => null);
+  if (player) {                       // recognised email -> straight in
+    state.identity = player.id; state.pending = false;
+    state.authStep = 'email';
+    return;
+  }
+  const claim = await api.getMyClaim(email).catch(() => null);
+  if (claim) {                        // claimed a name, waiting on the admin
+    state.identity = claim.player_id; state.pending = true;
+    state.authStep = 'email';
+    return;
+  }
+  state.identity = null; state.pending = false;   // new email -> claim/create step
+  state.authStep = 'claim';
 }
 
 // ---------- rendering ----------
@@ -111,11 +180,13 @@ function render() {
   renderView();
   renderNav();
   renderGate();
+  renderDispute();
+  renderAvatarMenu();
   renderToast();
 }
 
 function renderHeader() {
-  const idP = state.identity ? P(state.identity) : null;
+  const idP = me();
   $('header').innerHTML = `
   <div style="background:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--hairline);position:sticky;top:0;z-index:10">
     <div style="display:flex;align-items:center;gap:9px">
@@ -123,7 +194,7 @@ function renderHeader() {
       <span style="font-size:20px;font-weight:900;letter-spacing:-.5px;color:#191919">EF Pong</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      ${idP ? `<button class="tap" data-action="switch-identity" title="Switch player" style="border:none;background:transparent;padding:0;width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center"><span style="width:34px;height:34px;border-radius:999px;background:${idP.color};color:${idP.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid #E5F3FF">${esc(idP.initials)}</span></button>` : ''}
+      ${idP ? `<button class="tap" data-action="avatar-menu" title="Account" style="border:none;background:transparent;padding:0;width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;position:relative"><span style="width:34px;height:34px;border-radius:999px;background:${idP.color};color:${idP.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid #E5F3FF">${esc(idP.initials)}</span>${state.pending ? '<span style="position:absolute;bottom:-1px;right:-1px;width:15px;height:15px;border-radius:999px;background:#FAB005;border:2px solid #fff;display:flex;align-items:center;justify-content:center"><i class="ph-fill ph-hourglass-medium" style="color:#fff;font-size:8px"></i></span>' : ''}</button>` : ''}
       <a class="tap" href="wall.html" style="text-decoration:none;border:1px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;height:36px;padding:0 14px;display:flex;align-items:center;gap:6px;color:#191919"><i class="ph-bold ph-monitor" style="font-size:16px"></i><span style="font-size:13px;font-weight:700">Wall</span></a>
     </div>
   </div>`;
@@ -136,13 +207,24 @@ function renderNav() {
     { id: 'feed', label: 'Feed', icon: 'ph-fill ph-chat-teardrop-text' },
     { id: 'profile', label: 'You', icon: 'ph-fill ph-user' },
   ];
+  if (isAdmin()) tabs.push({ id: 'admin', label: 'Admin', icon: 'ph-fill ph-shield-check' });
+  const badge = state.feed.filter(m => m.status === 'disputed' && !m.isVoided).length + state.claims.length;
   $('nav').innerHTML = `
   <div style="background:#fff;border-top:1px solid var(--hairline);display:flex;padding:8px 8px calc(10px + env(safe-area-inset-bottom));position:sticky;bottom:0;z-index:10">
     ${tabs.map(t => `
       <button class="tap" data-action="nav" data-screen="${t.id}" style="flex:1;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;color:${t.id === state.screen ? '#006BD6' : 'rgba(25,25,25,.4)'}">
-        <i class="${t.icon}" style="font-size:24px"></i>
+        <span style="position:relative;display:flex"><i class="${t.icon}" style="font-size:24px"></i>${t.id === 'admin' && badge > 0 ? `<span style="position:absolute;top:-4px;right:-8px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#D1334A;color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">${badge}</span>` : ''}</span>
         <span style="font-size:10px;font-weight:700;letter-spacing:.2px">${t.label}</span>
       </button>`).join('')}
+  </div>`;
+}
+
+function pendingBanner() {
+  if (!state.pending) return '';
+  return `
+  <div style="margin:12px 16px 0;background:#FFF7E0;border:1px solid #F2C94C;border-radius:12px;padding:10px 13px;display:flex;align-items:center;gap:9px">
+    <i class="ph-fill ph-hourglass-medium" style="color:#946A00;font-size:17px;flex-shrink:0"></i>
+    <span style="font-size:12px;line-height:16px;color:#946A00;font-weight:500;flex:1">Verification pending &mdash; browse away. Logging &amp; disputing unlock once an admin approves you.</span>
   </div>`;
 }
 
@@ -155,8 +237,9 @@ function renderView() {
     $('view').innerHTML = `<div style="margin:24px 16px;padding:20px;background:#FCE4E8;border:1px solid rgba(209,51,74,.3);border-radius:16px;font-size:14px;color:#191919"><strong>Couldn't reach the server.</strong><br><span style="font-weight:300">${esc(state.error)}</span></div>`;
     return;
   }
-  const views = { leaderboard: viewLeaderboard, log: viewLog, feed: viewFeed, profile: viewProfile };
-  $('view').innerHTML = views[state.screen]();
+  const views = { leaderboard: viewLeaderboard, log: viewLog, feed: viewFeed, profile: viewProfile, admin: viewAdmin };
+  const v = views[state.screen] || viewLeaderboard;
+  $('view').innerHTML = pendingBanner() + v();
 }
 
 // ---------- leaderboard ----------
@@ -210,13 +293,26 @@ function viewLeaderboard() {
     ${!hasPodium ? `
     <div style="margin-top:14px;text-align:center;padding:18px;background:#E5F3FF;border:1px dashed rgba(0,107,214,.35);border-radius:14px">
       <div style="font-size:13px;font-weight:700;color:#006BD6">Get the office on the board</div>
-      <div style="font-size:12px;color:rgba(25,25,25,.6);font-weight:300;margin-top:2px">Tap your avatar &rarr; &ldquo;I'm new&rdquo; to add more players.</div>
+      <div style="font-size:12px;color:rgba(25,25,25,.6);font-weight:300;margin-top:2px">Share the link &mdash; teammates sign in and claim their name.</div>
     </div>` : ''}
   </div>`;
 }
 
 // ---------- log a match ----------
 function viewLog() {
+  const header = `
+    <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0 0 2px;letter-spacing:-.5px">Log a match</h1>
+    <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Enter the game you just played.</p>`;
+
+  if (state.pending) {
+    return `<div style="padding:20px 16px 28px">${header}
+      <div style="background:#fff;border:1.5px solid #F2C94C;border-radius:16px;padding:22px 18px;text-align:center">
+        <div style="width:54px;height:54px;border-radius:14px;background:#FFF7E0;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-lock-simple" style="color:#946A00;font-size:26px"></i></div>
+        <div style="font-size:16px;font-weight:700;color:#191919;margin-bottom:6px">Verify to log matches</div>
+        <p style="font-size:13px;line-height:20px;color:rgba(25,25,25,.6);font-weight:300;margin:0">An admin needs to confirm your sign-in before you can record results &mdash; this keeps anyone from logging games as you. You'll get in as soon as they approve you.</p>
+      </div></div>`;
+  }
+
   const slot = which => {
     const id = which === 'a' ? state.logA : state.logB;
     const p = id ? P(id) : null;
@@ -251,7 +347,6 @@ function viewLog() {
       </div>
     </div>`;
 
-  // preview
   const bothPicked = state.logA && state.logB && state.logA !== state.logB;
   const valid = bothPicked && validScore(state.scoreA, state.scoreB);
   let preview = '';
@@ -286,8 +381,7 @@ function viewLog() {
 
   return `
   <div style="padding:20px 16px 28px">
-    <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0 0 2px;letter-spacing:-.5px">Log a match</h1>
-    <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Enter the game you just played.</p>
+    ${header}
     <div style="display:flex;flex-direction:column;gap:10px">${slot('a')}${slot('b')}</div>
     <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin:20px 0 8px 2px">Score</div>
     <div style="display:flex;gap:12px">
@@ -299,13 +393,39 @@ function viewLog() {
   </div>`;
 }
 
+// ---------- ratings-changed notes ----------
+function ratingNotes() {
+  const events = (state.ratingEvents || []).filter(e => !seenEvents.has(e.id));
+  if (!events.length) return '';
+  const cards = events.map(e => {
+    let text;
+    if (e.kind === 'penalty') {
+      text = 'A penalty was applied to your rating after an admin review.';
+    } else {
+      const m = state.feed.find(x => x.id === e.match_id);
+      const opp = m ? first((m.winnerId === state.identity ? m.loser : m.winner).name) : 'an opponent';
+      text = `Your match vs ${esc(opp)} was voided by the admin — its ELO was reversed.`;
+    }
+    return `
+    <div style="background:#fff;border:1px solid rgba(25,25,25,.12);border-left:3px solid #D1334A;border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:10px">
+      <i class="ph-fill ph-arrows-counter-clockwise" style="color:#D1334A;font-size:18px;flex-shrink:0"></i>
+      <span style="flex:1;font-size:12.5px;line-height:17px;color:#191919;font-weight:400">${text} <span style="font-family:var(--font-mono);color:rgba(25,25,25,.55)">now ${e.rating_after}</span></span>
+      <button class="tap" data-action="dismiss-event" data-id="${esc(e.id)}" style="border:none;background:transparent;color:rgba(25,25,25,.4);width:26px;height:26px;border-radius:999px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-x" style="font-size:14px"></i></button>
+    </div>`;
+  }).join('');
+  return `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${cards}</div>`;
+}
+
 // ---------- feed ----------
 function viewFeed() {
+  const head = `
+    <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0 0 2px;letter-spacing:-.5px">Match feed</h1>
+    <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Every game, live. React and talk trash.</p>`;
+
   if (!state.feed.length) {
     return `
     <div style="padding:20px 16px 28px">
-      <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0 0 2px;letter-spacing:-.5px">Match feed</h1>
-      <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Every game, live. React and talk trash.</p>
+      ${head}
       <div style="text-align:center;padding:40px 22px;background:#fff;border:1px solid var(--hairline);border-radius:16px">
         <div style="width:56px;height:56px;border-radius:16px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i class="ph ph-ping-pong" style="color:rgba(25,25,25,.35);font-size:30px"></i></div>
         <div style="font-size:16px;font-weight:700;color:#191919">No matches yet</div>
@@ -316,6 +436,8 @@ function viewFeed() {
 
   const cards = state.feed.map(m => {
     const open = state.openComments.has(m.id);
+    const disputed = m.status === 'disputed' && !m.isVoided;
+    const voided = m.isVoided;
     const rBtn = (kind, glyph, n) => `
       <button class="tap" data-action="react" data-id="${esc(m.id)}" data-kind="${kind}" style="border:1px solid ${n > 0 ? 'rgba(0,107,214,.3)' : 'rgba(25,25,25,.12)'};background:${n > 0 ? 'rgba(0,107,214,.08)' : '#fff'};border-radius:999px;height:30px;padding:0 10px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:#191919"><span>${glyph}</span>${n}</button>`;
     const W = m.winner, L = m.loser;
@@ -327,8 +449,10 @@ function viewFeed() {
       </div>`).join('');
     return `
     <div style="background:#fff;border:1px solid var(--hairline);border-radius:16px;overflow:hidden;box-shadow:0 6px 18px -14px rgba(25,25,25,.4)">
-      ${m.upset ? '<div style="background:#DA2381;color:#fff;font-size:11px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;padding:5px 16px;display:flex;align-items:center;gap:6px"><i class="ph-fill ph-lightning"></i>Upset of the day</div>' : ''}
-      <div style="padding:14px 16px 12px">
+      ${m.upset && !disputed && !voided ? '<div style="background:#DA2381;color:#fff;font-size:11px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;padding:5px 16px;display:flex;align-items:center;gap:6px"><i class="ph-fill ph-lightning"></i>Upset of the day</div>' : ''}
+      ${disputed ? '<div style="background:#FFF7E0;color:#946A00;font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;padding:6px 16px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #F2C94C"><i class="ph-fill ph-warning"></i>Disputed &middot; with the admin</div>' : ''}
+      ${voided ? '<div style="background:#F0F0F0;color:rgba(25,25,25,.55);font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;padding:6px 16px;display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(25,25,25,.12)"><i class="ph-fill ph-prohibit"></i>Voided by admin &middot; no ELO</div>' : ''}
+      <div style="padding:14px 16px 12px;opacity:${voided ? '.5' : '1'}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:10px;flex:1">
             <div style="width:40px;height:40px;border-radius:999px;background:${W.avatar_color};color:${wc};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;position:relative">${esc(W.initials)}<i class="ph-fill ph-crown-simple" style="position:absolute;top:-9px;right:-6px;color:#FAB005;font-size:15px;transform:rotate(18deg)"></i></div>
@@ -343,14 +467,17 @@ function viewFeed() {
         <div style="display:flex;align-items:center;gap:8px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px">
           ${rBtn('fire', '🔥', m.reactions.fire)}${rBtn('wow', '😮', m.reactions.wow)}${rBtn('gg', '🤝', m.reactions.gg)}
           <button class="tap" data-action="toggle-comments" data-id="${esc(m.id)}" style="margin-left:auto;border:none;background:transparent;display:flex;align-items:center;gap:5px;color:rgba(25,25,25,.55);font-size:13px;font-weight:700"><i class="ph-bold ph-chat-circle" style="font-size:16px"></i>${m.comments.length}</button>
+          <button class="tap" data-action="open-dispute" data-id="${esc(m.id)}" title="Match options" style="border:none;background:transparent;width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:rgba(25,25,25,.4)"><i class="ph-bold ph-dots-three-outline" style="font-size:16px"></i></button>
         </div>
         ${open ? `
         <div style="margin-top:10px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px;display:flex;flex-direction:column;gap:8px">
           ${comments}
+          ${canAct() ? `
           <div style="display:flex;gap:8px;align-items:center;margin-top:2px">
             <input id="draft-${esc(m.id)}" data-draft="${esc(m.id)}" placeholder="Add some trash talk…" style="flex:1;height:38px;border:1px solid rgba(25,25,25,.15);border-radius:999px;padding:0 14px;font-size:13px;color:#191919;outline:none" />
             <button class="tap" data-action="send-comment" data-id="${esc(m.id)}" style="width:38px;height:38px;border-radius:999px;border:none;background:#006BD6;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-paper-plane-right" style="font-size:16px"></i></button>
-          </div>
+          </div>` : `
+          <div style="display:flex;align-items:center;gap:7px;margin-top:2px;background:#F5F5F5;border-radius:10px;padding:9px 12px;color:rgba(25,25,25,.5);font-size:12px;font-weight:500"><i class="ph-fill ph-hourglass-medium" style="font-size:14px"></i><span>Verify your sign-in to join the chat.</span></div>`}
         </div>` : ''}
       </div>
     </div>`;
@@ -358,8 +485,8 @@ function viewFeed() {
 
   return `
   <div style="padding:20px 16px 28px">
-    <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0 0 2px;letter-spacing:-.5px">Match feed</h1>
-    <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Every game, live. React and talk trash.</p>
+    ${head}
+    ${ratingNotes()}
     <div style="display:flex;flex-direction:column;gap:14px">${cards}</div>
   </div>`;
 }
@@ -367,11 +494,10 @@ function viewFeed() {
 // ---------- profile ----------
 function viewProfile() {
   const pp = P(state.profileId || state.identity);
-  if (!pp) return `<div style="padding:40px;text-align:center;color:rgba(25,25,25,.45)">Pick your name first.</div>`;
+  if (!pp) return `<div style="padding:40px;text-align:center;color:rgba(25,25,25,.45)">Sign in to see your profile.</div>`;
   const d = state.profileData;
   if (!d) return `<div style="padding:60px 20px;text-align:center;color:rgba(25,25,25,.45);font-size:14px;font-weight:300">Loading…</div>`;
 
-  // spark line from rating history
   const series = [1000, ...d.history.map(h => h.rating_after)];
   if (series.length === 1) series.push(pp.elo);
   const mn = Math.min(...series), mx = Math.max(...series), rng = Math.max(1, mx - mn);
@@ -393,7 +519,6 @@ function viewProfile() {
     </div>`;
   }).join('') || `<div style="padding:16px;background:#fff;border:1px solid var(--hairline);border-radius:12px;font-size:13px;color:rgba(25,25,25,.5);font-weight:300;text-align:center">No matches yet this season.</div>`;
 
-  // head-to-head
   const rivalsList = state.players.filter(p => p.id !== pp.id).slice(0, 6);
   const rival = P(state.rivalId) && state.rivalId !== pp.id ? P(state.rivalId) : rivalsList[0];
   let myWins = 0, theirWins = 0;
@@ -444,84 +569,294 @@ function viewProfile() {
   </div>`;
 }
 
-// ---------- identity gate ----------
+// ---------- admin ----------
+const REASON_LABELS = { score: 'Wrong score', nothappen: 'Match never happened', wrongplayer: 'Wrong player', other: 'Other' };
+
+function viewAdmin() {
+  if (!isAdmin()) { state.screen = 'leaderboard'; return viewLeaderboard(); }
+  const disputes = state.feed.filter(m => m.status === 'disputed' && !m.isVoided);
+  const disputeCards = disputes.map(m => {
+    const W = m.winner, L = m.loser;
+    const by = m.disputedBy ? P(m.disputedBy) : null;
+    return `
+    <div style="background:#fff;border:1px solid #F2C94C;border-radius:16px;overflow:hidden">
+      <div style="background:#FFF7E0;padding:6px 14px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:11px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:#946A00">Reason: ${esc(REASON_LABELS[m.disputeReason] || 'Flagged')}</span><span style="font-size:11px;font-weight:700;color:#946A00">by ${esc(by ? first(by.name) : '—')}</span></div>
+      <div style="padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:8px;flex:1"><div style="width:34px;height:34px;border-radius:999px;background:${W.avatar_color};color:${api.textColorFor(W.avatar_color)};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">${esc(W.initials)}</div><span style="font-size:14px;font-weight:700;color:#191919">${esc(first(W.name))}</span></div>
+          <div style="text-align:center;padding:0 8px"><div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:#191919;line-height:1">${m.winnerScore}&ndash;${m.loserScore}</div><div style="font-size:10px;color:rgba(25,25,25,.4);font-weight:700">${fmtTime(m.playedAt)}</div></div>
+          <div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end;text-align:right"><span style="font-size:14px;font-weight:700;color:#191919">${esc(first(L.name))}</span><div style="width:34px;height:34px;border-radius:999px;background:${L.avatar_color};color:${api.textColorFor(L.avatar_color)};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">${esc(L.initials)}</div></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="tap" data-action="resolve" data-id="${esc(m.id)}" data-act="uphold" ${state.busy ? 'disabled' : ''} style="flex:1;height:42px;border:1.5px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;color:#191919;font-size:13px;font-weight:700">Uphold</button>
+          <button class="tap" data-action="resolve" data-id="${esc(m.id)}" data-act="void" ${state.busy ? 'disabled' : ''} style="flex:1;height:42px;border:1.5px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;color:#191919;font-size:13px;font-weight:700">Void</button>
+        </div>
+        <button class="tap" data-action="resolve" data-id="${esc(m.id)}" data-act="void_penalize" ${state.busy ? 'disabled' : ''} style="width:100%;height:42px;margin-top:8px;border:none;background:#D1334A;border-radius:999px;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ph-bold ph-gavel" style="font-size:16px"></i>Void &amp; penalise &minus;50</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const claimCards = state.claims.map(c => {
+    const p = P(c.player_id);
+    return `
+    <div style="background:#fff;border:1px solid var(--hairline);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:999px;background:${p ? p.color : '#999'};color:${p ? p.textColor : '#fff'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${p ? esc(p.initials) : '?'}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:#191919">${esc(p ? p.name : c.player_id)}</div><div style="font-size:11px;color:rgba(25,25,25,.5);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.email)}</div></div>
+      <button class="tap" data-action="reject-claim" data-id="${esc(c.id)}" ${state.busy ? 'disabled' : ''} title="Reject" style="width:38px;height:38px;border-radius:999px;border:1.5px solid rgba(25,25,25,.15);background:#fff;color:#D1334A;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-x" style="font-size:16px"></i></button>
+      <button class="tap" data-action="approve-claim" data-id="${esc(c.id)}" ${state.busy ? 'disabled' : ''} title="Approve" style="width:38px;height:38px;border-radius:999px;border:none;background:#008928;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-check" style="font-size:16px"></i></button>
+    </div>`;
+  }).join('');
+
+  return `
+  <div style="padding:20px 16px 28px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><i class="ph-fill ph-shield-check" style="color:#006BD6;font-size:24px"></i><h1 style="font-size:28px;font-weight:700;color:#191919;margin:0;letter-spacing:-.5px">Admin</h1></div>
+    <p style="margin:0 0 20px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Only you see this tab. Disputes and sign-in claims land here.</p>
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919">Disputes</span><span style="font-size:11px;font-weight:900;background:#FDECEF;color:#D1334A;border-radius:999px;padding:1px 8px">${disputes.length}</span></div>
+    ${disputes.length ? `<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">${disputeCards}</div>`
+      : `<div style="background:#fff;border:1px solid var(--hairline);border-radius:14px;padding:22px;text-align:center;color:rgba(25,25,25,.5);font-size:13px;font-weight:300;margin-bottom:24px"><i class="ph ph-check-circle" style="font-size:22px;color:#008928;display:block;margin-bottom:6px"></i>No open disputes. The ladder's clean.</div>`}
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919">Claims to approve</span><span style="font-size:11px;font-weight:900;background:#E5F3FF;color:#006BD6;border-radius:999px;padding:1px 8px">${state.claims.length}</span></div>
+    ${state.claims.length ? `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px">${claimCards}</div>`
+      : `<div style="background:#fff;border:1px solid var(--hairline);border-radius:14px;padding:22px;text-align:center;color:rgba(25,25,25,.5);font-size:13px;font-weight:300;margin-bottom:24px">No one waiting to be verified.</div>`}
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919">Rollout</span></div>
+    <button class="tap" data-action="toggle-rollout" ${state.busy ? 'disabled' : ''} style="width:100%;background:#fff;border:1px solid var(--hairline);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;text-align:left">
+      <span style="width:40px;height:24px;border-radius:999px;background:${state.rolloutComplete ? '#008928' : 'rgba(25,25,25,.2)'};position:relative;flex-shrink:0;transition:background .15s"><span style="position:absolute;top:2px;left:${state.rolloutComplete ? '18px' : '2px'};width:20px;height:20px;border-radius:999px;background:#fff;transition:left .15s"></span></span>
+      <span style="flex:1"><span style="display:block;font-size:14px;font-weight:700;color:#191919">Rollout complete</span><span style="display:block;font-size:12px;color:rgba(25,25,25,.55);font-weight:300;line-height:16px">${state.rolloutComplete ? 'New sign-ins can only create a new player.' : 'New sign-ins can still claim an existing name.'}</span></span>
+    </button>
+  </div>`;
+}
+
+// ---------- identity gate / claim flow ----------
 function renderGate() {
-  const show = !state.loading && !state.error && (!state.identity || state.switching);
+  const show = !state.loading && !state.error && !state.identity;
   if (!show) { $('gate').innerHTML = ''; return; }
 
-  const creating = state.creating || state.players.length === 0;
-  const canClose = !!state.identity;
-  const empty = state.players.length === 0;
+  const step = state.authStep || 'email';
+  const emailOk = emailValid(state.authEmail);
+
+  // claim step: create-new only after rollout / when nothing's claimable
+  const list = claimable();
+  const gateCreating = state.creating || state.players.length === 0 || state.rolloutComplete || list.length === 0;
   const newName = ($('new-name') && $('new-name').value) || state._newName || '';
   const nm = newName.trim();
   const dupe = nm.length > 0 && state.players.some(p => p.name.toLowerCase() === nm.toLowerCase());
-  const disabled = nm.length === 0 || dupe || state.busy;
+  const createDisabled = nm.length === 0 || dupe || state.busy;
   const PAL = [['#006BD6', '#fff'], ['#DA2381', '#fff'], ['#008928', '#fff'], ['#FAB005', '#191919'], ['#D1334A', '#fff'], ['#191919', '#fff'], ['#0369A1', '#fff'], ['#C2410C', '#fff']];
   const [ncBg, ncText] = PAL[state.players.length % PAL.length];
 
-  const options = state.players.map(p => `
-    <button class="tap" data-action="pick-identity" data-id="${esc(p.id)}" style="display:flex;align-items:center;gap:12px;background:${p.id === state.identity ? '#E5F3FF' : '#fff'};border:1.5px solid ${p.id === state.identity ? 'rgba(0,107,214,.4)' : 'var(--hairline)'};border-radius:14px;padding:11px 14px;text-align:left;width:100%">
-      ${avatar(p, 40, 14)}
-      <span style="flex:1;font-size:16px;font-weight:700;color:#191919">${esc(p.name)}</span>
-      <span style="font-family:var(--font-mono);font-size:13px;color:rgba(25,25,25,.45)">${p.elo}</span>
-    </button>`).join('');
+  const titles = {
+    email: ['Sign in to EF Pong', "Enter your work email once — we'll send a magic link. No password. Come back with the same email and you're straight in."],
+    sent: ['Check your email', 'Open the link we just sent to finish signing in on this device.'],
+    claim: state.rolloutComplete
+      ? ['Add yourself', 'Everyone’s onboarded, so new sign-ins create a new player. An admin approves you before you can log or dispute.']
+      : ['Claim your name', 'New here? Pick the name you already play under, or add a new one. An admin confirms it’s you.'],
+  };
+  const gt = titles[step] || titles.email;
+  const activeIdx = (step === 'email' || step === 'sent') ? 0 : 1;
+  const progress = ['Verify email', 'Claim name'].map((name, i) => `
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+      <div style="height:4px;border-radius:999px;background:${i <= activeIdx ? '#006BD6' : 'rgba(0,107,214,.15)'}"></div>
+      <span style="font-size:10px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:${i <= activeIdx ? '#006BD6' : 'rgba(25,25,25,.35)'}">${name}</span>
+    </div>`).join('');
+
+  let body = '';
+  if (step === 'email') {
+    body = `
+    <div style="background:#fff;border:1.5px solid rgba(0,107,214,.25);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;gap:12px">
+      <label style="font-size:12px;font-weight:700;color:#191919">Work email</label>
+      <input id="auth-email" value="${esc(state.authEmail)}" type="email" placeholder="you@ef.com" autocomplete="email" style="width:100%;height:48px;border:1.5px solid rgba(25,25,25,.15);border-radius:12px;padding:0 14px;font-size:16px;font-weight:500;color:#191919;outline:none" />
+      <button class="tap" data-action="send-link" ${emailOk && !state.busy ? '' : 'disabled'} style="width:100%;height:48px;border:none;border-radius:999px;background:${emailOk && !state.busy ? '#006BD6' : 'rgba(25,25,25,.2)'};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-paper-plane-tilt" style="font-size:18px"></i>${state.busy ? 'Sending…' : 'Send magic link'}</button>
+      <p style="margin:0;font-size:11.5px;color:rgba(25,25,25,.45);font-weight:300;text-align:center">One email, once — no password. Next you'll pick your name, or add one if you're new.</p>
+    </div>`;
+  } else if (step === 'sent') {
+    body = `
+    <div style="background:#fff;border:1.5px solid rgba(0,107,214,.25);border-radius:16px;padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
+      <div style="width:64px;height:64px;border-radius:16px;background:#E5F3FF;display:flex;align-items:center;justify-content:center"><i class="ph-fill ph-envelope-simple-open" style="color:#006BD6;font-size:32px"></i></div>
+      <div style="font-size:15px;font-weight:500;color:#191919;line-height:22px">We sent a magic link to<br><b style="font-weight:700">${esc(state.authEmail)}</b></div>
+      <p style="margin:0;font-size:12.5px;color:rgba(25,25,25,.55);font-weight:300;line-height:18px">Open it on this device to finish signing in — you'll land back here automatically.</p>
+      <button class="tap" data-action="change-email" style="border:none;background:transparent;color:rgba(25,25,25,.55);font-size:13px;font-weight:700;padding:2px 0">Use a different email</button>
+    </div>`;
+  } else if (gateCreating) {
+    body = `
+      ${state.players.length === 0 ? `
+      <div style="text-align:center;padding:14px 8px 4px">
+        <div style="width:52px;height:52px;border-radius:14px;background:#E5F3FF;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-confetti" style="color:#006BD6;font-size:26px"></i></div>
+        <div style="font-size:16px;font-weight:700;color:#191919">No players yet</div>
+        <div style="font-size:13px;color:rgba(25,25,25,.55);font-weight:300;margin-top:2px">Be the first — add yourself to start the ladder.</div>
+      </div>` : ''}
+      <div style="background:#fff;border:1.5px solid rgba(0,107,214,.25);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div id="nc-avatar" style="width:64px;height:64px;border-radius:999px;background:${ncBg};color:${ncText};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px">${nm ? esc(mkInitials(nm)) : '?'}</div>
+        <input id="new-name" value="${esc(newName)}" placeholder="Type your full name" autocomplete="off" style="width:100%;height:46px;border:1.5px solid rgba(25,25,25,.15);border-radius:12px;padding:0 14px;font-size:16px;font-weight:500;color:#191919;outline:none;text-align:center" />
+        <div id="dupe-warn" class="${dupe ? '' : 'hidden'}" style="display:flex;align-items:center;gap:6px;color:#946A00;font-size:12px;font-weight:500;text-align:center"><i class="ph-fill ph-warning-circle" style="font-size:15px;flex-shrink:0"></i><span>Someone already has that name — add a last initial to tell you apart.</span></div>
+        <button id="create-btn" class="tap" data-action="create-player" ${createDisabled ? 'disabled' : ''} style="width:100%;height:48px;border:none;border-radius:999px;background:${createDisabled ? 'rgba(25,25,25,.2)' : '#006BD6'};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-user-plus" style="font-size:18px"></i>Add me &amp; continue</button>
+        <p style="margin:0;font-size:11px;color:rgba(25,25,25,.45);font-weight:300;text-align:center">You'll start at 1000 ELO, like everyone else.</p>
+      </div>
+      ${state.creating && list.length > 0 && !state.rolloutComplete ? '<button class="tap" data-action="cancel-create" style="border:none;background:transparent;color:rgba(25,25,25,.55);font-size:13px;font-weight:700;padding:6px 0">Back to the list</button>' : ''}`;
+  } else {
+    const options = list.map(p => `
+      <button class="tap" data-action="claim-identity" data-id="${esc(p.id)}" style="display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid var(--hairline);border-radius:14px;padding:11px 14px;text-align:left;width:100%">
+        ${avatar(p, 40, 14)}
+        <span style="flex:1;font-size:16px;font-weight:700;color:#191919">${esc(p.name)}</span>
+        <span style="font-family:var(--font-mono);font-size:13px;color:rgba(25,25,25,.45)">${p.elo}</span>
+      </button>`).join('');
+    body = `
+      <button class="tap" data-action="open-create" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#E5F3FF;border:1.5px dashed rgba(0,107,214,.4);border-radius:14px;padding:12px 14px;width:100%;color:#006BD6;font-size:14px;font-weight:700"><i class="ph-bold ph-user-plus" style="font-size:18px"></i>I'm new — add me</button>
+      ${options}`;
+  }
 
   $('gate').innerHTML = `
   <div style="position:fixed;inset:0;z-index:70;background:#fff;display:flex;flex-direction:column;max-width:480px;margin:0 auto">
-    <div style="padding:28px 26px 18px;flex-shrink:0">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:26px">
+    <div style="padding:${step === 'email' || step === 'sent' ? '40px' : '28px'} 26px 16px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
         <div style="width:34px;height:34px;border-radius:9px;background:#006BD6;display:flex;align-items:center;justify-content:center"><i class="ph-fill ph-ping-pong" style="color:#fff;font-size:21px"></i></div>
         <span style="font-size:22px;font-weight:900;letter-spacing:-.5px;color:#191919">EF Pong</span>
-        ${canClose ? '<button class="tap" data-action="close-gate" style="margin-left:auto;border:none;background:#F5F5F5;width:34px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#191919"><i class="ph-bold ph-x" style="font-size:16px"></i></button>' : ''}
+        ${state.session ? '<button class="tap" data-action="sign-out" style="margin-left:auto;border:none;background:#F5F5F5;height:34px;padding:0 12px;border-radius:999px;display:flex;align-items:center;gap:6px;color:#191919;font-size:12px;font-weight:700"><i class="ph-bold ph-sign-out" style="font-size:14px"></i>Sign out</button>' : ''}
       </div>
-      <h1 style="font-size:26px;font-weight:700;color:#191919;margin:0 0 6px;letter-spacing:-.5px">Who are you?</h1>
-      <p style="margin:0;font-size:14px;line-height:20px;color:rgba(25,25,25,.6);font-weight:300">Pick your name so your matches and comments are yours &mdash; or add yourself if you're new. No password &mdash; secure sign-in comes later.</p>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">${progress}</div>
+      <h1 style="font-size:26px;font-weight:700;color:#191919;margin:0 0 6px;letter-spacing:-.5px">${esc(gt[0])}</h1>
+      <p style="margin:0;font-size:14px;line-height:20px;color:rgba(25,25,25,.6);font-weight:300">${esc(gt[1])}</p>
     </div>
-    <div class="app-scroll" style="flex:1;overflow-y:auto;padding:4px 18px 20px;display:flex;flex-direction:column;gap:8px">
-      ${creating ? `
-        ${empty ? `
-        <div style="text-align:center;padding:14px 8px 4px">
-          <div style="width:52px;height:52px;border-radius:14px;background:#E5F3FF;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-confetti" style="color:#006BD6;font-size:26px"></i></div>
-          <div style="font-size:16px;font-weight:700;color:#191919">No players yet</div>
-          <div style="font-size:13px;color:rgba(25,25,25,.55);font-weight:300;margin-top:2px">Be the first &mdash; add yourself to start the ladder.</div>
-        </div>` : ''}
-        <div style="background:#fff;border:1.5px solid rgba(0,107,214,.25);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:14px">
-          <div id="nc-avatar" style="width:64px;height:64px;border-radius:999px;background:${ncBg};color:${ncText};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px">${nm ? esc(api.mkInitials(nm)) : '?'}</div>
-          <input id="new-name" value="${esc(newName)}" placeholder="Type your full name" autocomplete="off" style="width:100%;height:46px;border:1.5px solid rgba(25,25,25,.15);border-radius:12px;padding:0 14px;font-size:16px;font-weight:500;color:#191919;outline:none;text-align:center" />
-          <div id="dupe-warn" class="${dupe ? '' : 'hidden'}" style="display:flex;align-items:center;gap:6px;color:#946A00;font-size:12px;font-weight:500;text-align:center"><i class="ph-fill ph-warning-circle" style="font-size:15px;flex-shrink:0"></i><span>Someone already has that name &mdash; add a last initial to tell you apart.</span></div>
-          <button id="create-btn" class="tap" data-action="create-player" ${disabled ? 'disabled' : ''} style="width:100%;height:48px;border:none;border-radius:999px;background:${disabled ? 'rgba(25,25,25,.2)' : '#006BD6'};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-user-plus" style="font-size:18px"></i>Add me &amp; continue</button>
-          <p style="margin:0;font-size:11px;color:rgba(25,25,25,.45);font-weight:300;text-align:center">You'll start at 1000 ELO, like everyone else.</p>
-        </div>
-        ${state.creating && state.players.length > 0 ? '<button class="tap" data-action="cancel-create" style="border:none;background:transparent;color:rgba(25,25,25,.55);font-size:13px;font-weight:700;padding:6px 0">Back to the list</button>' : ''}
-      ` : `
-        <button class="tap" data-action="open-create" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#E5F3FF;border:1.5px dashed rgba(0,107,214,.4);border-radius:14px;padding:12px 14px;width:100%;color:#006BD6;font-size:14px;font-weight:700"><i class="ph-bold ph-user-plus" style="font-size:18px"></i>I'm new &mdash; add me</button>
-        ${options}
-      `}
-    </div>
+    <div class="app-scroll" style="flex:1;overflow-y:auto;padding:4px 18px 24px;display:flex;flex-direction:column;gap:8px">${body}</div>
   </div>`;
 
-  // live initials + dupe check without re-render (keeps input focus)
-  const input = $('new-name');
-  if (input) {
-    input.addEventListener('input', () => {
-      state._newName = input.value;
-      const v = input.value.trim();
-      $('nc-avatar').textContent = v ? api.mkInitials(v) : '?';
+  // wire live inputs without re-render (keep focus)
+  const emailInput = $('auth-email');
+  if (emailInput) {
+    emailInput.addEventListener('input', () => {
+      state.authEmail = emailInput.value;
+      const btn = emailInput.parentElement.querySelector('[data-action="send-link"]');
+      const ok = emailValid(emailInput.value);
+      btn.disabled = !ok || state.busy;
+      btn.style.background = (ok && !state.busy) ? '#006BD6' : 'rgba(25,25,25,.2)';
+    });
+    emailInput.addEventListener('keydown', e => { if (e.key === 'Enter' && emailValid(emailInput.value)) actions['send-link'](); });
+    emailInput.focus();
+  }
+  const nameInput = $('new-name');
+  if (nameInput) {
+    nameInput.addEventListener('input', () => {
+      state._newName = nameInput.value;
+      const v = nameInput.value.trim();
+      $('nc-avatar').textContent = v ? mkInitials(v) : '?';
       const isDupe = v.length > 0 && state.players.some(p => p.name.toLowerCase() === v.toLowerCase());
       $('dupe-warn').classList.toggle('hidden', !isDupe);
-      const dis = v.length === 0 || isDupe;
+      const dis = v.length === 0 || isDupe || state.busy;
       $('create-btn').disabled = dis;
       $('create-btn').style.background = dis ? 'rgba(25,25,25,.2)' : '#006BD6';
     });
-    input.addEventListener('keydown', e => { if (e.key === 'Enter' && !$('create-btn').disabled) actions['create-player'](); });
-    if (!state.identity) input.focus();
+    nameInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !$('create-btn').disabled) actions['create-player'](); });
+    nameInput.focus();
   }
+}
+
+// ---------- avatar menu ----------
+function renderAvatarMenu() {
+  if (!state.avatarMenu || !me()) { $('menu').innerHTML = ''; return; }
+  const idP = me();
+  const email = (state.session && state.session.user && state.session.user.email) || (idP.email || '');
+  $('menu').innerHTML = `
+  <div data-action="menu-backdrop" style="position:fixed;inset:0;z-index:75;max-width:480px;margin:0 auto">
+    <div data-stop="1" style="position:absolute;top:60px;right:16px;width:240px;background:#fff;border:1px solid rgba(25,25,25,.1);border-radius:16px;box-shadow:0 16px 40px -12px rgba(25,25,25,.4);overflow:hidden;animation:popIn .16s var(--ease)">
+      <div style="padding:14px 16px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(25,25,25,.08)">
+        <span style="width:40px;height:40px;border-radius:999px;background:${idP.color};color:${idP.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${esc(idP.initials)}</span>
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:#191919">${esc(idP.name)}</div><div style="font-size:11px;color:rgba(25,25,25,.5);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(email)}</div></div>
+      </div>
+      ${state.pending ? `<div style="margin:10px 12px 4px;background:#FFF7E0;border:1px solid #F2C94C;border-radius:10px;padding:9px 11px;display:flex;gap:8px"><i class="ph-fill ph-hourglass-medium" style="color:#946A00;font-size:15px;flex-shrink:0;margin-top:1px"></i><span style="font-size:11.5px;line-height:16px;color:#946A00;font-weight:500">Verification pending. You can look around, but logging &amp; disputing unlock once an admin approves you.</span></div>` : ''}
+      <button class="tap" data-action="my-profile" style="width:100%;border:none;background:transparent;display:flex;align-items:center;gap:10px;padding:13px 16px;color:#191919;font-size:14px;font-weight:600;text-align:left"><i class="ph-bold ph-user" style="font-size:18px"></i>Your profile</button>
+      <button class="tap" data-action="sign-out" style="width:100%;border:none;background:transparent;display:flex;align-items:center;gap:10px;padding:13px 16px;color:#D1334A;font-size:14px;font-weight:600;text-align:left;border-top:1px solid rgba(25,25,25,.06)"><i class="ph-bold ph-sign-out" style="font-size:18px"></i>Sign out</button>
+    </div>
+  </div>`;
+}
+
+// ---------- dispute sheet ----------
+function renderDispute() {
+  if (!state.disputeFor) { $('dispute').innerHTML = ''; return; }
+  const m = state.feed.find(x => x.id === state.disputeFor);
+  if (!m) { $('dispute').innerHTML = ''; return; }
+  const W = m.winner, L = m.loser;
+  const mine = !!(state.identity && (m.winnerId === state.identity || m.loserId === state.identity));
+  const disputed = m.status === 'disputed' && !m.isVoided;
+  const voided = m.isVoided;
+  const counting = !disputed && !voided;
+
+  const summary = `
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:18px">
+      <div style="width:30px;height:30px;border-radius:999px;background:${W.avatar_color};color:${api.textColorFor(W.avatar_color)};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">${esc(W.initials)}</div>
+      <span style="font-size:14px;font-weight:700;color:#191919">${esc(first(W.name))}</span>
+      <span style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:#191919">${m.winnerScore}&ndash;${m.loserScore}</span>
+      <span style="font-size:14px;font-weight:700;color:#191919">${esc(first(L.name))}</span>
+      <div style="width:30px;height:30px;border-radius:999px;background:${L.avatar_color};color:${api.textColorFor(L.avatar_color)};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">${esc(L.initials)}</div>
+    </div>`;
+
+  let inner = '';
+  if (counting && mine && !state.pending) {
+    const reasons = [['score', 'Wrong score'], ['nothappen', 'This match never happened'], ['wrongplayer', 'Wrong player picked'], ['other', 'Something else']].map(([k, label]) => {
+      const sel = state.disputeReason === k;
+      return `
+      <button class="tap" data-action="dispute-reason" data-r="${k}" style="display:flex;align-items:center;gap:12px;background:${sel ? '#FDECEF' : '#fff'};border:1.5px solid ${sel ? '#D1334A' : 'rgba(25,25,25,.14)'};border-radius:14px;padding:14px 16px;text-align:left;width:100%">
+        <span style="width:20px;height:20px;border-radius:999px;border:2px solid ${sel ? '#D1334A' : 'rgba(25,25,25,.3)'};background:${sel ? '#D1334A' : 'transparent'};flex-shrink:0"></span>
+        <span style="font-size:15px;font-weight:700;color:#191919">${label}</span>
+      </button>`;
+    }).join('');
+    inner = `
+      <h3 style="font-size:19px;font-weight:700;color:#191919;margin:0 0 4px;text-align:center">What's wrong with this match?</h3>
+      <p style="font-size:13px;line-height:19px;color:rgba(25,25,25,.6);font-weight:300;margin:0 0 16px;text-align:center">It goes to the admin to void or keep. The result stays live until they decide — disputing alone doesn't change anyone's ELO.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">${reasons}</div>
+      <button class="tap" data-action="submit-dispute" ${state.disputeReason && !state.busy ? '' : 'disabled'} style="width:100%;height:50px;border:none;border-radius:999px;background:${state.disputeReason ? '#D1334A' : 'rgba(25,25,25,.2)'};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-flag" style="font-size:18px"></i>Send dispute to the admin</button>
+      <button class="tap" data-action="close-dispute" style="width:100%;border:none;background:transparent;color:rgba(25,25,25,.55);font-size:14px;font-weight:700;padding:12px 0 0">Cancel</button>`;
+  } else if (counting && mine && state.pending) {
+    inner = `
+      <div style="text-align:center;padding:0 6px 6px">
+        <div style="width:52px;height:52px;border-radius:14px;background:#FFF7E0;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-hourglass-medium" style="color:#946A00;font-size:26px"></i></div>
+        <h3 style="font-size:18px;font-weight:700;color:#191919;margin:0 0 6px">Verify to dispute</h3>
+        <p style="font-size:13px;line-height:20px;color:rgba(25,25,25,.6);font-weight:300;margin:0 0 16px">Your sign-in is still waiting for admin approval. Once you're verified you can dispute matches you played in.</p>
+        <button class="tap" data-action="close-dispute" style="width:100%;height:48px;border:none;border-radius:999px;background:#191919;color:#fff;font-size:15px;font-weight:700">Got it</button>
+      </div>`;
+  } else if (counting && !mine) {
+    inner = `
+      <div style="text-align:center;padding:0 6px 6px">
+        <div style="width:52px;height:52px;border-radius:14px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-lock-simple" style="color:rgba(25,25,25,.45);font-size:26px"></i></div>
+        <h3 style="font-size:18px;font-weight:700;color:#191919;margin:0 0 6px">Only the players can dispute</h3>
+        <p style="font-size:13px;line-height:20px;color:rgba(25,25,25,.6);font-weight:300;margin:0 0 16px">A match can only be disputed by the two people who played it.</p>
+        <button class="tap" data-action="close-dispute" style="width:100%;height:48px;border:none;border-radius:999px;background:#191919;color:#fff;font-size:15px;font-weight:700">Got it</button>
+      </div>`;
+  } else if (voided) {
+    inner = `
+      <div style="text-align:center;padding:0 6px 6px">
+        <div style="width:52px;height:52px;border-radius:14px;background:#F0F0F0;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-prohibit" style="color:rgba(25,25,25,.5);font-size:26px"></i></div>
+        <h3 style="font-size:18px;font-weight:700;color:#191919;margin:0 0 6px">Voided by the admin</h3>
+        <p style="font-size:13px;line-height:20px;color:rgba(25,25,25,.6);font-weight:300;margin:0 0 16px">This match no longer counts. Its ELO was reversed for the two players — nobody else was affected.</p>
+        <button class="tap" data-action="close-dispute" style="width:100%;height:48px;border:none;border-radius:999px;background:#191919;color:#fff;font-size:15px;font-weight:700">Close</button>
+      </div>`;
+  } else { // disputed
+    const canWithdraw = mine && m.disputedBy === state.identity;
+    inner = `
+      <div style="text-align:center;padding:0 6px 6px">
+        <div style="width:52px;height:52px;border-radius:14px;background:#FFF7E0;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-warning" style="color:#946A00;font-size:26px"></i></div>
+        <h3 style="font-size:18px;font-weight:700;color:#191919;margin:0 0 6px">This match is disputed</h3>
+        <p style="font-size:13px;line-height:20px;color:rgba(25,25,25,.6);font-weight:300;margin:0 0 12px">It's with the admin to void or keep. The result stays live until they decide.</p>
+        <div style="display:inline-flex;align-items:center;gap:6px;background:#FFF7E0;border:1px solid #F2C94C;border-radius:999px;padding:5px 12px;margin-bottom:16px"><span style="font-size:11px;font-weight:700;color:#946A00;text-transform:uppercase;letter-spacing:.4px">Reason:</span><span style="font-size:12px;font-weight:700;color:#946A00">${esc(REASON_LABELS[m.disputeReason] || 'Flagged')}</span></div>
+        ${canWithdraw ? '<button class="tap" data-action="withdraw-dispute" style="width:100%;height:48px;border:1.5px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;color:#191919;font-size:15px;font-weight:700;margin-bottom:8px">Withdraw my dispute</button>' : ''}
+        <button class="tap" data-action="close-dispute" style="width:100%;border:none;background:transparent;color:rgba(25,25,25,.55);font-size:14px;font-weight:700;padding:8px 0 0">Close</button>
+      </div>`;
+  }
+
+  $('dispute').innerHTML = `
+  <div data-action="dispute-backdrop" style="position:fixed;inset:0;z-index:80;background:rgba(25,25,25,.42);display:flex;flex-direction:column;justify-content:flex-end;max-width:480px;margin:0 auto">
+    <div data-stop="1" style="background:#fff;border-radius:24px 24px 0 0;padding:10px 20px 26px;animation:toastIn .22s var(--ease)">
+      <div style="width:40px;height:4px;border-radius:999px;background:rgba(25,25,25,.15);margin:0 auto 16px"></div>
+      ${summary}
+      ${inner}
+    </div>
+  </div>`;
 }
 
 // ---------- toast ----------
 function renderToast() {
   $('toast').innerHTML = state.toast ? `
-  <div style="position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:#191919;color:#fff;border-radius:999px;padding:12px 20px;display:flex;align-items:center;gap:8px;box-shadow:0 12px 30px -8px rgba(25,25,25,.6);animation:toastIn .25s var(--ease);white-space:nowrap;z-index:80"><i class="ph-fill ph-check-circle" style="color:#4ADE80;font-size:18px"></i><span style="font-size:14px;font-weight:700">${esc(state.toast)}</span></div>` : '';
+  <div style="position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:#191919;color:#fff;border-radius:999px;padding:12px 20px;display:flex;align-items:center;gap:8px;box-shadow:0 12px 30px -8px rgba(25,25,25,.6);animation:toastIn .25s var(--ease);white-space:nowrap;z-index:90"><i class="ph-fill ph-check-circle" style="color:#4ADE80;font-size:18px"></i><span style="font-size:14px;font-weight:700">${esc(state.toast)}</span></div>` : '';
 }
 
 let toastTimer;
@@ -536,49 +871,75 @@ function showToast(text) {
 const actions = {
   'nav': el => {
     const s = el.dataset.screen;
-    if (s === 'profile') {
-      state.profileId = state.identity;
-      openProfile(state.identity);
-      return;
-    }
+    if (s === 'profile') { openProfile(state.identity); return; }
     state.screen = s;
     state.pickerOpen = null;
     render();
   },
   'open-profile': el => openProfile(el.dataset.id),
+  'my-profile': () => { state.avatarMenu = false; openProfile(state.identity); },
   'set-rival': el => { state.rivalId = el.dataset.id; render(); },
-  'switch-identity': () => { state.switching = true; render(); },
-  'close-gate': () => { state.switching = false; state.creating = false; render(); },
+  'avatar-menu': () => { state.avatarMenu = !state.avatarMenu; render(); },
+  'menu-backdrop': () => { state.avatarMenu = false; render(); },
+  'dispute-backdrop': () => { state.disputeFor = null; state.disputeReason = null; render(); },
+  'dismiss-event': el => { markEventSeen(el.dataset.id); render(); },
+
+  // ---- auth / claim ----
+  'send-link': async () => {
+    if (!emailValid(state.authEmail) || state.busy) return;
+    state.busy = true; render();
+    try {
+      await api.sendMagicLink(state.authEmail);
+      state.authStep = 'sent';
+    } catch (err) {
+      showToast('Could not send the link — try again');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+  'change-email': () => { state.authStep = 'email'; render(); },
   'open-create': () => { state.creating = true; state._newName = ''; render(); },
   'cancel-create': () => { state.creating = false; state._newName = ''; render(); },
-  'pick-identity': el => {
-    state.identity = el.dataset.id;
-    try { localStorage.setItem('efpong_identity', state.identity); } catch (e) {}
-    state.switching = false;
-    if (!state.logA) state.logA = state.identity;
-    render();
+  'claim-identity': async el => {
+    if (state.busy) return;
+    const id = el.dataset.id;
+    state.busy = true;
+    try {
+      await api.createClaim(id, state.authEmail);
+      state.identity = id; state.pending = true;
+      state.authStep = 'email'; state.creating = false;
+      await refreshData();
+      showToast('Signed in — verification pending');
+    } catch (err) {
+      showToast('Could not claim that name — try again');
+      console.error(err);
+    } finally { state.busy = false; render(); }
   },
   'create-player': async () => {
-    const name = (($('new-name') || {}).value || '').trim();
+    const name = (($('new-name') || {}).value || state._newName || '').trim();
     if (!name || state.busy) return;
     if (state.players.some(p => p.name.toLowerCase() === name.toLowerCase())) return;
     state.busy = true;
     try {
       const np = await api.addPlayer(name, state.players.length);
-      state.identity = np.id;
-      try { localStorage.setItem('efpong_identity', np.id); } catch (e) {}
-      state.creating = false; state.switching = false; state._newName = '';
-      if (!state.logA) state.logA = np.id;
+      await api.createClaim(np.id, state.authEmail);
+      state.identity = np.id; state.pending = true;
+      state.creating = false; state._newName = ''; state.authStep = 'email';
       await refreshData();
-      showToast(`Welcome, ${first(np.name)}! You start at 1000.`);
+      showToast('Signed in — verification pending');
     } catch (err) {
       showToast('Could not add you — try again');
       console.error(err);
-    } finally {
-      state.busy = false;
-      render();
-    }
+    } finally { state.busy = false; render(); }
   },
+  'sign-out': async () => {
+    state.avatarMenu = false;
+    try { await api.signOut(); } catch (e) {}
+    state.identity = null; state.pending = false; state.session = null;
+    state.authStep = 'email'; state.authEmail = ''; state.screen = 'leaderboard';
+    render();
+  },
+
+  // ---- log ----
   'toggle-picker': el => {
     const w = el.dataset.which;
     state.pickerOpen = state.pickerOpen === w ? null : w;
@@ -587,9 +948,7 @@ const actions = {
   'pick-player': el => {
     const { which, id } = el.dataset;
     const other = which === 'a' ? state.logB : state.logA;
-    if (id !== other) {
-      if (which === 'a') state.logA = id; else state.logB = id;
-    }
+    if (id !== other) { if (which === 'a') state.logA = id; else state.logB = id; }
     state.pickerOpen = null;
     render();
   },
@@ -600,10 +959,9 @@ const actions = {
   },
   'submit-match': async () => {
     const { logA, logB, scoreA, scoreB } = state;
-    if (!logA || !logB || logA === logB || !validScore(scoreA, scoreB) || state.busy) return;
+    if (!logA || !logB || logA === logB || !validScore(scoreA, scoreB) || state.busy || !canAct()) return;
     const aWon = scoreA > scoreB;
-    state.busy = true;
-    render();
+    state.busy = true; render();
     try {
       const result = await api.logMatch({
         winnerId: aWon ? logA : logB,
@@ -619,12 +977,9 @@ const actions = {
       state.scoreA = 11; state.scoreB = 0; state.logB = null;
       showToast(`${wName} wins! +${result.elo_delta} ELO`);
     } catch (err) {
-      showToast('Could not record match');
+      showToast(err.message || 'Could not record match');
       console.error(err);
-    } finally {
-      state.busy = false;
-      render();
-    }
+    } finally { state.busy = false; render(); }
   },
   'react': async el => {
     const { id, kind } = el.dataset;
@@ -641,7 +996,7 @@ const actions = {
     const id = el.dataset.id;
     const input = $('draft-' + id);
     const text = (input && input.value || '').trim();
-    if (!text || !state.identity) return;
+    if (!text || !canAct()) return;
     input.value = '';
     try {
       await api.postComment(id, state.identity, text);
@@ -654,9 +1009,94 @@ const actions = {
       console.error(err);
     }
   },
+
+  // ---- dispute sheet ----
+  'open-dispute': el => { state.disputeFor = el.dataset.id; state.disputeReason = null; render(); },
+  'close-dispute': () => { state.disputeFor = null; state.disputeReason = null; render(); },
+  'dispute-reason': el => { state.disputeReason = el.dataset.r; render(); },
+  'submit-dispute': async () => {
+    if (!state.disputeFor || !state.disputeReason || state.busy) return;
+    state.busy = true;
+    const id = state.disputeFor, reason = state.disputeReason;
+    try {
+      await api.disputeMatch(id, reason);
+      state.disputeFor = null; state.disputeReason = null;
+      await refreshData();
+      showToast('Dispute sent to the admin');
+    } catch (err) {
+      showToast(err.message || 'Could not send dispute');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+  'withdraw-dispute': async () => {
+    if (!state.disputeFor || state.busy) return;
+    state.busy = true;
+    const id = state.disputeFor;
+    try {
+      await api.withdrawDispute(id);
+      state.disputeFor = null; state.disputeReason = null;
+      await refreshData();
+      showToast('Dispute withdrawn');
+    } catch (err) {
+      showToast(err.message || 'Could not withdraw');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+
+  // ---- admin ----
+  'resolve': async el => {
+    if (state.busy) return;
+    const id = el.dataset.id, act = el.dataset.act;
+    state.busy = true; render();
+    try {
+      await api.resolveDispute(id, act);
+      await refreshData();
+      showToast(act === 'uphold' ? 'Result upheld — stays live'
+        : act === 'void_penalize' ? 'Voided + −50 penalty' : 'Match voided — ELO reversed');
+    } catch (err) {
+      showToast(err.message || 'Could not resolve');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+  'approve-claim': async el => {
+    if (state.busy) return;
+    state.busy = true; render();
+    try {
+      await api.approveClaim(el.dataset.id);
+      await refreshData();
+      showToast('Claim approved — email bound');
+    } catch (err) {
+      showToast(err.message || 'Could not approve');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+  'reject-claim': async el => {
+    if (state.busy) return;
+    state.busy = true; render();
+    try {
+      await api.rejectClaim(el.dataset.id);
+      await refreshData();
+      showToast('Claim rejected');
+    } catch (err) {
+      showToast(err.message || 'Could not reject');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+  'toggle-rollout': async () => {
+    if (state.busy) return;
+    state.busy = true; render();
+    try {
+      await api.setRolloutComplete(!state.rolloutComplete);
+      state.rolloutComplete = !state.rolloutComplete;
+    } catch (err) {
+      showToast(err.message || 'Could not update rollout');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
 };
 
 async function openProfile(id) {
+  state.avatarMenu = false;
   if (!id) { state.screen = 'profile'; render(); return; }
   state.screen = 'profile';
   state.profileId = id;
@@ -674,8 +1114,11 @@ async function openProfile(id) {
 }
 
 document.addEventListener('click', e => {
+  const stop = e.target.closest('[data-stop]');
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
+  // clicks inside a menu/sheet card shouldn't fall through to the backdrop's close action
+  if (stop && (el.dataset.action === 'menu-backdrop' || el.dataset.action === 'dispute-backdrop')) return;
   const fn = actions[el.dataset.action];
   if (fn) fn(el);
 });
@@ -692,9 +1135,8 @@ function scheduleRefresh() {
   refreshTimer = setTimeout(async () => {
     try {
       await refreshData();
-      // don't clobber typing: skip re-render if a draft input is focused
       const a = document.activeElement;
-      if (!a || (!a.dataset.draft && a.id !== 'new-name')) render();
+      if (!a || (!a.dataset.draft && a.id !== 'new-name' && a.id !== 'auth-email')) render();
     } catch (e) { console.error(e); }
   }, 400);
 }
@@ -710,10 +1152,17 @@ function scheduleRefresh() {
   render();
   try {
     await loadCore();
-    api.subscribeToChanges(scheduleRefresh);
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) scheduleRefresh();
+    const session = await api.getSession();
+    await resolveSession(session);
+    if (state.identity) { try { await refreshData(); } catch (e) { console.error(e); } }
+    // react to magic-link redirect completing, or sign-out, in any tab
+    api.onAuthChange(async newSession => {
+      await resolveSession(newSession);
+      try { await refreshData(); } catch (e) { console.error(e); }
+      render();
     });
+    api.subscribeToChanges(scheduleRefresh);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleRefresh(); });
   } catch (err) {
     state.loading = false;
     state.error = err.message || String(err);

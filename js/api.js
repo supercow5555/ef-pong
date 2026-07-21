@@ -40,7 +40,7 @@ export async function getActiveSeason() {
 export async function getLeaderboard(seasonId) {
   const { data, error } = await supabase
     .from('player')
-    .select('id, name, initials, avatar_color, join_date, standings(elo, wins, losses, peak)')
+    .select('id, name, initials, avatar_color, join_date, email, is_admin, standings(elo, wins, losses, peak)')
     .eq('standings.season_id', seasonId);
   if (error) throw error;
   return data
@@ -49,39 +49,48 @@ export async function getLeaderboard(seasonId) {
       return {
         id: p.id, name: p.name, initials: p.initials,
         color: p.avatar_color, textColor: textColorFor(p.avatar_color),
+        email: p.email || null, isAdmin: !!p.is_admin,
         elo: s.elo, wins: s.wins, losses: s.losses, peak: s.peak,
       };
     })
     .sort((a, b) => b.elo - a.elo || a.name.localeCompare(b.name));
 }
 
-export async function getFeed(seasonId, limit = 30) {
-  const { data, error } = await supabase
+// includeVoided: the app shows voided matches (dimmed, with a banner); the wall
+// keeps them out of its ticker. Disputed matches are never voided, so they show
+// regardless.
+export async function getFeed(seasonId, limit = 30, { includeVoided = false } = {}) {
+  let q = supabase
     .from('match')
-    .select(`id, winner_score, loser_score, elo_delta, played_at,
+    .select(`id, winner_id, loser_id, winner_score, loser_score, elo_delta, played_at,
+      status, is_voided, dispute_reason, disputed_by,
       winner:player!match_winner_id_fkey(id, name, initials, avatar_color),
       loser:player!match_loser_id_fkey(id, name, initials, avatar_color),
       reaction(type),
       comment(id, text, posted_at, author:player(id, name, initials, avatar_color)),
-      rating_history(player_id, rating_after)`)
-    .eq('season_id', seasonId)
-    .eq('is_voided', false)
+      rating_history(player_id, rating_after, kind)`)
+    .eq('season_id', seasonId);
+  if (!includeVoided) q = q.eq('is_voided', false);
+  const { data, error } = await q
     .order('played_at', { ascending: false })
     .order('posted_at', { referencedTable: 'comment', ascending: true })
     .limit(limit);
   if (error) throw error;
   return data.map(m => {
     // pre-match ratings from the audit trail -> upset detection, same rule as the prototype
-    const wAfter = m.rating_history.find(h => h.player_id === m.winner.id);
-    const lAfter = m.rating_history.find(h => h.player_id === m.loser.id);
+    const wAfter = m.rating_history.find(h => h.player_id === m.winner.id && h.kind === 'match');
+    const lAfter = m.rating_history.find(h => h.player_id === m.loser.id && h.kind === 'match');
     const upset = wAfter && lAfter
       ? ((lAfter.rating_after + m.elo_delta) - (wAfter.rating_after - m.elo_delta)) >= 150
       : false;
     const counts = { fire: 0, wow: 0, gg: 0 };
     m.reaction.forEach(r => { counts[r.type] = (counts[r.type] || 0) + 1; });
     return {
-      id: m.id, winnerScore: m.winner_score, loserScore: m.loser_score,
+      id: m.id, winnerId: m.winner_id, loserId: m.loser_id,
+      winnerScore: m.winner_score, loserScore: m.loser_score,
       delta: m.elo_delta, playedAt: m.played_at, upset,
+      status: m.status || 'confirmed', isVoided: !!m.is_voided,
+      disputeReason: m.dispute_reason, disputedBy: m.disputed_by,
       winner: m.winner, loser: m.loser, reactions: counts,
       comments: m.comment.map(c => ({ id: c.id, text: c.text, author: c.author })),
     };
@@ -151,11 +160,123 @@ export async function deleteComment(commentId) {
   if (error) throw error;
 }
 
+// ---------- auth (magic link) ----------
+export async function getSession() {
+  const { data } = await supabase.auth.getSession();
+  return data.session || null;
+}
+
+export function onAuthChange(cb) {
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => cb(session));
+  return data.subscription;
+}
+
+export async function sendMagicLink(email) {
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: { emailRedirectTo: window.location.origin + window.location.pathname },
+  });
+  if (error) throw error;
+}
+
+export async function signOut() {
+  await supabase.auth.signOut();
+}
+
+// email -> the roster player it's bound to (recognised sign-in), or null
+export async function resolvePlayerByEmail(email) {
+  const { data, error } = await supabase.from('player')
+    .select('id, name, initials, avatar_color, email, is_admin')
+    .ilike('email', email.trim()).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// ---------- claims (sign-ins awaiting admin approval) ----------
+export async function getMyClaim(email) {
+  const { data, error } = await supabase.from('claim')
+    .select('id, player_id, email').ilike('email', email.trim())
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function listClaims() {
+  const { data, error } = await supabase.from('claim')
+    .select('id, player_id, email, created_at')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+export async function createClaim(playerId, email) {
+  // don't stack duplicate claims for the same person
+  const { data: existing } = await supabase.from('claim')
+    .select('id').eq('player_id', playerId).limit(1);
+  if (existing && existing.length) return existing[0];
+  const { data, error } = await supabase.from('claim')
+    .insert({ player_id: playerId, email: email.trim() }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function approveClaim(claimId) {
+  const { error } = await supabase.rpc('approve_claim', { p_claim_id: claimId });
+  if (error) throw error;
+}
+
+export async function rejectClaim(claimId) {
+  const { error } = await supabase.rpc('reject_claim', { p_claim_id: claimId });
+  if (error) throw error;
+}
+
+// ---------- disputes ----------
+export async function disputeMatch(matchId, reason) {
+  const { error } = await supabase.rpc('dispute_match', { p_match_id: matchId, p_reason: reason });
+  if (error) throw error;
+}
+
+export async function withdrawDispute(matchId) {
+  const { error } = await supabase.rpc('withdraw_dispute', { p_match_id: matchId });
+  if (error) throw error;
+}
+
+// action: 'uphold' | 'void' | 'void_penalize'
+export async function resolveDispute(matchId, action, penalty = 50) {
+  const { data, error } = await supabase.rpc('resolve_dispute', {
+    p_match_id: matchId, p_action: action, p_penalty: penalty,
+  });
+  if (error) throw error;
+  return data;
+}
+
+// void / penalty events for a player -> "your ELO changed" feed notes
+export async function getRatingEvents(playerId) {
+  const { data, error } = await supabase.from('rating_history')
+    .select('id, match_id, rating_after, kind, recorded_at')
+    .eq('player_id', playerId).in('kind', ['void', 'penalty'])
+    .order('recorded_at', { ascending: false }).limit(20);
+  if (error) throw error;
+  return data;
+}
+
+// ---------- rollout flag ----------
+export async function getRolloutComplete() {
+  const { data, error } = await supabase.rpc('rollout_complete');
+  if (error) throw error;
+  return !!data;
+}
+
+export async function setRolloutComplete(on) {
+  const { error } = await supabase.rpc('set_rollout_complete', { p_on: on });
+  if (error) throw error;
+}
+
 // Live wall / app freshness: subscribe to the four hot tables; onChange fires
 // on any insert/update/delete so callers can refetch their views.
 export function subscribeToChanges(onChange, onStatus) {
   const channel = supabase.channel('efpong-live');
-  for (const table of ['match', 'standings', 'reaction', 'comment']) {
+  for (const table of ['match', 'standings', 'reaction', 'comment', 'claim']) {
     channel.on('postgres_changes', { event: '*', schema: 'public', table }, onChange);
   }
   channel.subscribe(status => onStatus && onStatus(status));
