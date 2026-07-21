@@ -83,7 +83,7 @@ export async function getFeed(seasonId, limit = 30, { includeVoided = false } = 
     const upset = wAfter && lAfter
       ? ((lAfter.rating_after + m.elo_delta) - (wAfter.rating_after - m.elo_delta)) >= 150
       : false;
-    const counts = { fire: 0, wow: 0, gg: 0 };
+    const counts = { fire: 0, wow: 0, gg: 0, lol: 0, angry: 0, rage: 0, poop: 0 };
     m.reaction.forEach(r => { counts[r.type] = (counts[r.type] || 0) + 1; });
     return {
       id: m.id, winnerId: m.winner_id, loserId: m.loser_id,
