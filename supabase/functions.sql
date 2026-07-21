@@ -43,7 +43,20 @@ declare
   v_match_id text;
   v_w_new int;
   v_l_new int;
+  v_caller text;
 begin
+  -- Trust wave: match ownership. The caller must be a verified player (email
+  -- bound via magic link) AND one of the two players. The opponent may be any
+  -- roster player, verified or not. ELO math below is unchanged from the MVP.
+  v_caller := current_player();
+  if v_caller is null then
+    raise exception 'sign in (and get verified) to log matches';
+  end if;
+  if v_caller <> p_winner_id and v_caller <> p_loser_id then
+    raise exception 'you can only log matches you played in';
+  end if;
+  p_entered_by := v_caller;
+
   if p_winner_id = p_loser_id then
     raise exception 'winner and loser must be different players';
   end if;
@@ -229,11 +242,174 @@ begin
 end;
 $$;
 
+-- ============================================================================
+-- Trust wave (wave 1): disputes, localized reversal, penalties, claims.
+-- See design_handoff_trust_wave/EF Pong Trust Handoff.dc.html §4.
+-- ============================================================================
+
+-- the approved player behind the current request (see schema.sql). Redefined
+-- here so functions.sql is runnable standalone against the live DB.
+create or replace function current_player()
+returns text language sql stable security definer set search_path = public as
+$$ select id from player
+   where email = nullif(current_setting('request.jwt.claims', true)::json ->> 'email', '') $$;
+
+-- the caller must map to an is_admin player, else abort
+create or replace function require_admin()
+returns text language plpgsql stable security definer set search_path = public as
+$$
+declare v_id text;
+begin
+  select id into v_id from player
+    where email = nullif(current_setting('request.jwt.claims', true)::json ->> 'email', '')
+      and is_admin;
+  if v_id is null then
+    raise exception 'admin only';
+  end if;
+  return v_id;
+end;
+$$;
+
+-- ---------- dispute_match — flag only, no rating change ----------
+-- Either participant may dispute, and only while the match is live ('confirmed').
+create or replace function dispute_match(p_match_id text, p_reason text)
+returns void language plpgsql security definer set search_path = public as
+$$
+declare v_caller text;
+begin
+  v_caller := current_player();
+  if v_caller is null then
+    raise exception 'sign in (and get verified) to dispute';
+  end if;
+  update match set status = 'disputed',
+                   dispute_reason = p_reason::dispute_reason,
+                   disputed_by = v_caller
+   where id = p_match_id and status = 'confirmed'
+     and (winner_id = v_caller or loser_id = v_caller);
+  if not found then
+    raise exception 'not a participant, or match not disputable';
+  end if;
+end;
+$$;
+
+-- ---------- withdraw_dispute — disputer takes it back (-> live) ----------
+create or replace function withdraw_dispute(p_match_id text)
+returns void language plpgsql security definer set search_path = public as
+$$
+declare v_caller text;
+begin
+  v_caller := current_player();
+  update match set status = 'confirmed', dispute_reason = null, disputed_by = null
+   where id = p_match_id and status = 'disputed' and disputed_by = v_caller;
+  if not found then
+    raise exception 'nothing to withdraw';
+  end if;
+end;
+$$;
+
+-- ---------- resolve_dispute — uphold / void / void+penalise (LOCALIZED) ----------
+-- Voiding reverses ONLY this match's stored elo_delta on ITS two players and
+-- undoes their W/L. Nobody else moves — no season replay, no cascade.
+create or replace function resolve_dispute(
+  p_match_id text,
+  p_action   text,          -- 'uphold' | 'void' | 'void_penalize'
+  p_penalty  int default 50)
+returns json language plpgsql security definer set search_path = public as
+$$
+declare m match%rowtype; v_season text;
+begin
+  perform require_admin();
+
+  select * into m from match where id = p_match_id;
+  if not found then raise exception 'match not found'; end if;
+  v_season := m.season_id;
+
+  if p_action = 'uphold' then
+    update match set status = 'confirmed', dispute_reason = null, disputed_by = null
+     where id = p_match_id;
+    return json_build_object('upheld', p_match_id);
+  end if;
+
+  if m.is_voided then
+    raise exception 'already voided';
+  end if;
+
+  -- VOID: reverse only this match's delta, on its two players.
+  update standings set elo = elo - m.elo_delta, wins = greatest(0, wins - 1)
+    where player_id = m.winner_id and season_id = v_season;
+  update standings set elo = elo + m.elo_delta, losses = greatest(0, losses - 1)
+    where player_id = m.loser_id and season_id = v_season;
+  update match set is_voided = true, status = 'disputed' where id = p_match_id;
+  insert into rating_history (player_id, match_id, rating_after, kind)
+    select player_id, m.id, elo, 'void' from standings
+     where season_id = v_season and player_id in (m.winner_id, m.loser_id);
+
+  if p_action = 'void_penalize' then   -- flat, non-zero-sum sanction on the offender (the winner)
+    update standings set elo = greatest(100, elo - p_penalty)
+      where player_id = m.winner_id and season_id = v_season;
+    insert into rating_history (player_id, match_id, rating_after, kind)
+      select m.winner_id, null, elo, 'penalty' from standings
+       where season_id = v_season and player_id = m.winner_id;
+  end if;
+
+  return json_build_object('voided', p_match_id, 'penalized', p_action = 'void_penalize');
+end;
+$$;
+
+-- ---------- approve_claim / reject_claim — bind (or drop) the email ----------
+create or replace function approve_claim(p_claim_id text)
+returns void language plpgsql security definer set search_path = public as
+$$
+declare c claim%rowtype;
+begin
+  perform require_admin();
+  select * into c from claim where id = p_claim_id;
+  if not found then raise exception 'claim not found'; end if;
+  update player set email = c.email where id = c.player_id;  -- bind -> recognised next time
+  delete from claim where id = p_claim_id;
+end;
+$$;
+
+create or replace function reject_claim(p_claim_id text)
+returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform require_admin();
+  delete from claim where id = p_claim_id;
+end;
+$$;
+
+-- ---------- rollout flag — readable by all, flippable by admin only ----------
+-- (app_config itself is invisible to clients via RLS; these narrow accessors
+--  avoid exposing admin_secret.)
+create or replace function rollout_complete()
+returns boolean language sql stable security definer set search_path = public as
+$$ select coalesce((select value from app_config where key = 'rollout_complete'), 'false') = 'true' $$;
+
+create or replace function set_rollout_complete(p_on boolean)
+returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform require_admin();
+  insert into app_config (key, value) values ('rollout_complete', case when p_on then 'true' else 'false' end)
+    on conflict (key) do update set value = excluded.value;
+end;
+$$;
+
 -- ---------- grants ----------
-grant execute on function log_match(text, text, int, int, text) to anon;
-grant execute on function correct_match(text, text, text, text, text, int, int) to anon;
-grant execute on function roll_season(text, text, text) to anon;
+grant execute on function rollout_complete()             to anon, authenticated;
+grant execute on function set_rollout_complete(boolean)  to anon, authenticated;
+grant execute on function log_match(text, text, int, int, text) to anon, authenticated;
+grant execute on function correct_match(text, text, text, text, text, int, int) to anon, authenticated;
+grant execute on function roll_season(text, text, text) to anon, authenticated;
+grant execute on function dispute_match(text, text)      to anon, authenticated;
+grant execute on function withdraw_dispute(text)         to anon, authenticated;
+grant execute on function resolve_dispute(text, text, int) to anon, authenticated;
+grant execute on function approve_claim(text)            to anon, authenticated;
+grant execute on function reject_claim(text)             to anon, authenticated;
+grant execute on function current_player()               to anon, authenticated;
+grant execute on function require_admin()                to anon, authenticated;
 -- helpers stay callable but harmless
 grant execute on function elo_expected(int, int), elo_margin_mult(int),
-  elo_calc_delta(int, int, int, int, int), valid_score(int, int) to anon;
+  elo_calc_delta(int, int, int, int, int), valid_score(int, int) to anon, authenticated;
 revoke execute on function replay_season(text) from anon, authenticated;
