@@ -20,7 +20,8 @@ create table player (
   join_date      timestamptz not null default now(),
   login_identity text,
   email          text unique,                 -- bound on admin approval; identifies returning sign-ins
-  is_admin       boolean not null default false  -- DB-only flag; never grantable from the client
+  is_admin       boolean not null default false, -- DB-only flag; never grantable from the client
+  last_seen_season text                        -- id of the season whose podium reveal this player last dismissed (podium shows once per roll)
 );
 
 create table season (

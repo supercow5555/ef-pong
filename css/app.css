@@ -42,7 +42,22 @@ button:disabled{cursor:default}
 @keyframes tickerRow{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 /* feed emoji-picker strip entrance */
 @keyframes fcPop{from{transform:translateY(6px) scale(.96);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+/* opponent-picker panel drop-in */
+@keyframes sheetIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .fc-emoji:hover{background:#F0F3F7}
+
+/* season podium reveal (design direction 1c — the Podium Show) */
+@keyframes cfall{0%{transform:translateY(-30px) rotate(0);opacity:0}8%{opacity:1}100%{transform:translateY(820px) rotate(540deg);opacity:.9}}
+@keyframes enCol{0%{transform:translateY(28px);opacity:0}55%{opacity:1}100%{transform:translateY(0);opacity:1}}
+@keyframes enBar{0%{transform:scaleY(0)}100%{transform:scaleY(1)}}
+@keyframes enUp{0%{transform:translateY(20px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes enFade{0%{opacity:0}100%{opacity:1}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 0 0 rgba(250,176,5,.55),0 0 34px 4px rgba(250,176,5,.35)}50%{box-shadow:0 0 0 10px rgba(250,176,5,0),0 0 48px 10px rgba(250,176,5,.5)}}
+.cf{position:absolute;top:0;border-radius:1px;animation:cfall 3.4s linear infinite}
+.en-col{animation:enCol .85s cubic-bezier(.2,.75,.2,1) both}
+.en-bar{transform-origin:bottom;animation:enBar .6s cubic-bezier(.2,.8,.25,1) both}
+.en-up{animation:enUp .55s cubic-bezier(.2,.7,.2,1) both}
+.en-fade{animation:enFade .7s ease both}
 
 .tap{transition:transform .12s var(--ease), background .15s var(--ease), box-shadow .15s var(--ease)}
 .tap:active{transform:scale(.97)}

@@ -59,6 +59,19 @@ const state = {
   feedFilter: 'all',    // 'all' | 'mine' | <playerId>
   byPlayerRowOpen: false,
   openPicker: null,     // matchId whose emoji strip is open, or null
+  feedSeason: null,     // which season's feed to show (null = active/live season)
+  pastFeeds: {},        // seasonId -> cached feed rows for closed seasons (fetched on demand)
+
+  // seasons
+  seasons: [],          // all seasons, most-recent first (id, name, dates, champion…)
+  standingsBySeason: {},// season id -> frozen standings rows, elo desc
+  matchCounts: {},      // season id -> non-voided match count
+  seasonModal: null,    // null | 'start' | { edit: seasonId } | { rebuild: seasonId }
+  seasonName: '',       // draft for the start/rename name input
+  recrown: true,        // rebuild dialog re-crown toggle
+  showAllSeasons: false,// past-seasons list expansion
+  hallSeason: null,     // selected season id in the Hall tab
+  podium: false,        // is the podium reveal showing
 
   toast: null,
   loading: true,
@@ -158,6 +171,23 @@ async function refreshData() {
   state.history = history;
   state.claims = claims;
   state.rolloutComplete = rollout;
+
+  // Season history (all standings + a match tally) is the heaviest read and only
+  // feeds the podium (boot), the Admin panel, and the Hall — so refetch it only when
+  // it's actually on screen or not yet loaded, not on every realtime tick.
+  if (!state.seasons.length || state.screen === 'admin' || state.screen === 'hall') {
+    const sh = await api.getSeasonHistory().catch(() => null);
+    if (sh) {
+      state.seasons = sh.seasons;
+      state.standingsBySeason = sh.standingsBySeason;
+      state.matchCounts = sh.matchCountBySeason;
+    }
+  }
+  // default the Hall selection to the most-recent closed season
+  if (!state.hallSeason || !state.seasons.some(s => s.id === state.hallSeason && !s.isActive)) {
+    const firstPast = state.seasons.find(s => !s.isActive);
+    state.hallSeason = firstPast ? firstPast.id : null;
+  }
   if (state.identity && !P(state.identity)) state.identity = null;
   // verified iff the player row has a bound email — auto-flips when an admin approves
   if (state.identity) state.pending = !(P(state.identity) && P(state.identity).email);
@@ -165,10 +195,33 @@ async function refreshData() {
   state.logA = state.identity;
   if (state.identity) {
     state.ratingEvents = await api.getRatingEvents(state.identity).catch(() => []);
-    state.myMatches = await api.getPlayerMatches(state.identity, state.season.id).catch(() => []);
+    state.myMatches = await api.getPlayerMatches(state.identity).catch(() => []);
   } else {
     state.myMatches = [];
   }
+}
+
+// The most-recently closed season (seasons come back most-recent-first).
+function lastClosedSeason() {
+  return (state.seasons || []).find(s => !s.isActive) || null;
+}
+
+// Show the podium once per roll: a closed season exists and the signed-in player hasn't
+// yet dismissed the reveal for the current (post-roll) active season.
+function maybeShowPodium() {
+  const m = me();
+  if (!m || state.pending || !state.season) return;   // pending users can't persist last_seen -> would loop
+  const closed = lastClosedSeason();
+  if (closed && m.lastSeenSeason !== state.season.id) state.podium = true;
+}
+
+// Fetch + cache a past (frozen) season's feed on demand. The live season's feed is
+// already in state.feed; closed seasons are loaded only when their feed is opened.
+async function loadPastFeed(seasonId) {
+  if (state.pastFeeds[seasonId]) return;
+  try {
+    state.pastFeeds[seasonId] = await api.getFeed(seasonId, 60, { includeVoided: true });
+  } catch (e) { console.error(e); state.pastFeeds[seasonId] = []; }
 }
 
 // Resolve the current Supabase session into an app identity.
@@ -207,8 +260,11 @@ function render() {
   renderGate();
   renderDispute();
   renderAvatarMenu();
+  renderSeason();
+  renderPodium();
   renderToast();
   wireLogSearch();
+  wireSeasonName();
 }
 
 // Live opponent-search input: re-render on each keystroke, then restore focus
@@ -243,6 +299,7 @@ function renderNav() {
     { id: 'log', label: 'Log', icon: 'ph-fill ph-plus-circle' },
     { id: 'feed', label: 'Feed', icon: 'ph-fill ph-chat-teardrop-text' },
     { id: 'profile', label: 'You', icon: 'ph-fill ph-user' },
+    { id: 'hall', label: 'Hall', icon: 'ph-fill ph-trophy' },
   ];
   if (isAdmin()) tabs.push({ id: 'admin', label: 'Admin', icon: 'ph-fill ph-shield-check' });
   const badge = state.feed.filter(m => m.status === 'disputed' && !m.isVoided).length + state.claims.length;
@@ -274,7 +331,7 @@ function renderView() {
     $('view').innerHTML = `<div style="margin:24px 16px;padding:20px;background:#FCE4E8;border:1px solid rgba(209,51,74,.3);border-radius:16px;font-size:14px;color:#191919"><strong>Couldn't reach the server.</strong><br><span style="font-weight:300">${esc(state.error)}</span></div>`;
     return;
   }
-  const views = { leaderboard: viewLeaderboard, log: viewLog, feed: viewFeed, profile: viewProfile, admin: viewAdmin };
+  const views = { leaderboard: viewLeaderboard, log: viewLog, feed: viewFeed, profile: viewProfile, hall: viewHall, admin: viewAdmin };
   const v = views[state.screen] || viewLeaderboard;
   $('view').innerHTML = pendingBanner() + v();
 }
@@ -550,15 +607,44 @@ function viewFeed() {
       <p style="margin:2px 0 0;font-size:12px;color:rgba(25,25,25,.5);font-weight:300">Every game, live. React and talk trash.</p>
     </div>`;
 
-  if (!state.feed.length) {
+  // which season's feed: live (state.feed) or a closed one (fetched into state.pastFeeds)
+  const seasonId = state.feedSeason || state.season.id;
+  const isPast = seasonId !== state.season.id;
+  const rows = isPast ? state.pastFeeds[seasonId] : state.feed;   // undefined while a past feed loads
+
+  // ---- season selector (only when there's more than one season) ----
+  const seasonBar = state.seasons.length > 1 ? `
+    <div class="app-scroll" style="display:flex;gap:8px;overflow-x:auto;padding:10px 16px 2px">
+      ${state.seasons.map(s => {
+        const on = seasonId === s.id;
+        const label = s.isActive ? 'This season' : s.name;
+        return `<button class="tap" data-action="set-feed-season" data-id="${esc(s.id)}" style="height:32px;padding:0 13px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap;flex-shrink:0;border:1px solid ${on ? '#006BD6' : 'rgba(25,25,25,.15)'};background:${on ? '#E5F3FF' : '#fff'};color:${on ? '#006BD6' : '#191919'}">${esc(label)}</button>`;
+      }).join('')}
+    </div>` : '';
+  const pastName = isPast ? (state.seasons.find(s => s.id === seasonId) || {}).name : '';
+  const pastBanner = isPast ? `
+    <div style="margin:8px 16px 0;display:flex;align-items:center;gap:9px;background:#E5F3FF;border:1px solid rgba(0,107,214,.2);border-radius:12px;padding:9px 13px">
+      <i class="ph-fill ph-snowflake" style="color:#006BD6;font-size:15px;flex-shrink:0"></i>
+      <span style="flex:1;font-size:12px;font-weight:300;color:#191919">${esc(pastName)} is frozen &mdash; these results won't change.</span>
+    </div>` : '';
+
+  // a past feed still loading
+  if (isPast && rows === undefined) {
+    return `<div style="padding:0 0 28px">${title}${seasonBar}${pastBanner}
+      <div style="padding:50px 20px;text-align:center;color:rgba(25,25,25,.45);font-size:14px;font-weight:300">Loading…</div></div>`;
+  }
+
+  if (!rows.length) {
     return `
     <div style="padding:0 0 28px">
       ${title}
-      ${ratingNotes() ? `<div style="padding:12px 16px 0">${ratingNotes()}</div>` : ''}
+      ${seasonBar}
+      ${pastBanner}
+      ${!isPast && ratingNotes() ? `<div style="padding:12px 16px 0">${ratingNotes()}</div>` : ''}
       <div style="margin:16px 16px 0;text-align:center;padding:40px 22px;background:#fff;border:1px solid var(--hairline);border-radius:16px">
         <div style="width:56px;height:56px;border-radius:16px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i class="ph ph-ping-pong" style="color:rgba(25,25,25,.35);font-size:30px"></i></div>
-        <div style="font-size:16px;font-weight:700;color:#191919">No matches yet</div>
-        <div style="font-size:13px;color:rgba(25,25,25,.55);font-weight:300;margin-top:4px">Play a game, then log it &mdash; it'll show up here for everyone to react to.</div>
+        <div style="font-size:16px;font-weight:700;color:#191919">${isPast ? 'No matches this season' : 'No matches yet'}</div>
+        <div style="font-size:13px;color:rgba(25,25,25,.55);font-weight:300;margin-top:4px">${isPast ? 'This season closed without any recorded games.' : "Play a game, then log it &mdash; it'll show up here for everyone to react to."}</div>
       </div>
     </div>`;
   }
@@ -576,7 +662,7 @@ function viewFeed() {
 
   // ---- by-player avatar row (distinct feed participants, excluding you) ----
   const seen = new Set(); const participants = [];
-  state.feed.forEach(m => [m.winner, m.loser].forEach(pl => {
+  rows.forEach(m => [m.winner, m.loser].forEach(pl => {
     if (pl.id !== state.identity && !seen.has(pl.id)) { seen.add(pl.id); participants.push(pl); }
   }));
   const byPlayerRow = state.byPlayerRowOpen ? `
@@ -607,7 +693,7 @@ function viewFeed() {
     </div>`;
 
   // ---- filtered matches ----
-  const matches = state.feed.filter(m => {
+  const matches = rows.filter(m => {
     if (filter === 'all') return true;
     if (filter === 'mine') return state.identity && (m.winnerId === state.identity || m.loserId === state.identity);
     return m.winnerId === filter || m.loserId === filter;
@@ -625,10 +711,12 @@ function viewFeed() {
         <div style="background:#F5F5F5;border-radius:12px;padding:7px 11px"><span style="font-size:12px;font-weight:700;color:#191919">${c.author ? esc(first(c.author.name)) : '?'}</span> <span style="font-size:12px;color:#191919;font-weight:300">${esc(c.text)}</span></div>
       </div>`).join('');
 
-    const pills = REACTIONS.filter(r => (m.reactions[r.key] || 0) > 0).map(r => `
-      <button class="tap" data-action="react" data-id="${esc(m.id)}" data-kind="${r.key}" style="height:30px;padding:0 10px;border:1px solid rgba(0,107,214,.28);background:rgba(0,107,214,.07);border-radius:999px;flex-shrink:0;display:flex;align-items:center;gap:5px"><span style="font-size:14px">${r.emoji}</span><span style="font-size:13px;font-weight:700;color:#191919">${m.reactions[r.key]}</span></button>`).join('');
-    const addBtn = `<button class="tap" data-action="toggle-reactions" data-id="${esc(m.id)}" title="Add reaction" style="width:30px;height:30px;border-radius:999px;background:#fff;border:1px solid rgba(25,25,25,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-smiley-sticker" style="font-size:15px;color:rgba(25,25,25,.6)"></i></button>`;
-    const pickerStrip = state.openPicker === m.id ? `
+    // past (frozen) seasons are read-only: reactions show as static chips, no add/comment/dispute
+    const pills = REACTIONS.filter(r => (m.reactions[r.key] || 0) > 0).map(r => isPast
+      ? `<span style="height:30px;padding:0 10px;border:1px solid rgba(25,25,25,.12);background:#F5F5F5;border-radius:999px;flex-shrink:0;display:flex;align-items:center;gap:5px"><span style="font-size:14px">${r.emoji}</span><span style="font-size:13px;font-weight:700;color:rgba(25,25,25,.6)">${m.reactions[r.key]}</span></span>`
+      : `<button class="tap" data-action="react" data-id="${esc(m.id)}" data-kind="${r.key}" style="height:30px;padding:0 10px;border:1px solid rgba(0,107,214,.28);background:rgba(0,107,214,.07);border-radius:999px;flex-shrink:0;display:flex;align-items:center;gap:5px"><span style="font-size:14px">${r.emoji}</span><span style="font-size:13px;font-weight:700;color:#191919">${m.reactions[r.key]}</span></button>`).join('');
+    const addBtn = isPast ? '' : `<button class="tap" data-action="toggle-reactions" data-id="${esc(m.id)}" title="Add reaction" style="width:30px;height:30px;border-radius:999px;background:#fff;border:1px solid rgba(25,25,25,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-smiley-sticker" style="font-size:15px;color:rgba(25,25,25,.6)"></i></button>`;
+    const pickerStrip = (!isPast && state.openPicker === m.id) ? `
       <div class="app-scroll" style="position:absolute;bottom:44px;left:0;z-index:30;background:#fff;border:1px solid rgba(25,25,25,.1);border-radius:999px;box-shadow:0 14px 34px -10px rgba(25,25,25,.4);padding:5px 6px;display:flex;gap:2px;overflow-x:auto;max-width:100%;animation:fcPop .16s cubic-bezier(0.45,0.05,0.12,0.88)">
         ${REACTIONS.map(r => `<button class="tap fc-emoji" data-action="pick-reaction" data-id="${esc(m.id)}" data-kind="${r.key}" style="width:38px;height:38px;border-radius:999px;border:none;background:transparent;font-size:21px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${r.emoji}</button>`).join('')}
       </div>` : '';
@@ -659,13 +747,13 @@ function viewFeed() {
         <div style="position:relative;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px">
           <div class="app-scroll" style="flex:1;min-width:0;overflow-x:auto;display:flex;gap:6px">${pills}${addBtn}</div>
           <button class="tap" data-action="toggle-comments" data-id="${esc(m.id)}" style="flex-shrink:0;border:none;background:transparent;display:flex;align-items:center;gap:5px;color:rgba(25,25,25,.55);font-size:13px;font-weight:700"><i class="ph-bold ph-chat-circle" style="font-size:16px"></i>${m.comments.length}</button>
-          <button class="tap" data-action="open-dispute" data-id="${esc(m.id)}" title="Match options" style="flex-shrink:0;border:none;background:transparent;width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:rgba(25,25,25,.4)"><i class="ph-bold ph-dots-three-outline" style="font-size:16px"></i></button>
+          ${isPast ? '' : `<button class="tap" data-action="open-dispute" data-id="${esc(m.id)}" title="Match options" style="flex-shrink:0;border:none;background:transparent;width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:rgba(25,25,25,.4)"><i class="ph-bold ph-dots-three-outline" style="font-size:16px"></i></button>`}
           ${pickerStrip}
         </div>
         ${open ? `
         <div style="margin-top:10px;border-top:1px solid rgba(25,25,25,.07);padding-top:10px;display:flex;flex-direction:column;gap:8px">
           ${comments}
-          ${canAct() ? `
+          ${isPast ? '' : canAct() ? `
           <div style="display:flex;gap:8px;align-items:center;margin-top:2px">
             <input id="draft-${esc(m.id)}" data-draft="${esc(m.id)}" placeholder="Add some trash talk…" style="flex:1;height:38px;border:1px solid rgba(25,25,25,.15);border-radius:999px;padding:0 14px;font-size:13px;color:#191919;outline:none" />
             <button class="tap" data-action="send-comment" data-id="${esc(m.id)}" style="width:38px;height:38px;border-radius:999px;border:none;background:#006BD6;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-bold ph-paper-plane-right" style="font-size:16px"></i></button>
@@ -683,7 +771,9 @@ function viewFeed() {
   return `
   <div style="padding:0 0 4px">
     ${title}
-    ${ratingNotes() ? `<div style="padding:12px 16px 0">${ratingNotes()}</div>` : ''}
+    ${seasonBar}
+    ${pastBanner}
+    ${!isPast && ratingNotes() ? `<div style="padding:12px 16px 0">${ratingNotes()}</div>` : ''}
     ${filterBar}
     ${list}
   </div>`;
@@ -834,6 +924,140 @@ function viewProfile() {
   </div>`;
 }
 
+// ---------- seasons: shared helpers ----------
+const SEASON_LEN_DAYS = 14;   // seasons run ~two weeks (design "runs 14 days")
+
+// "Jun 30 – Jul 13" from ISO start/end (end falls back to today for a live season)
+function fmtDateRange(startsAt, endsAt) {
+  const fmt = iso => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+  return `${fmt(startsAt)} – ${endsAt ? fmt(endsAt) : 'now'}`;
+}
+
+// Prefill suggestion for a new season name (fully editable). Handles the two common
+// patterns: "Q3 2026" -> "Q4 2026" (quarter, wrapping Q4->Q1 next year) and a trailing
+// counter like "Fortnight 15" -> "Fortnight 16".
+function nextSeasonName() {
+  const name = ((state.season && state.season.name) || '').trim();
+  const q = name.match(/^Q([1-4])\s+(\d{4})$/i);
+  if (q) {
+    let qn = parseInt(q[1], 10), yr = parseInt(q[2], 10);
+    if (qn === 4) { qn = 1; yr += 1; } else { qn += 1; }
+    return `Q${qn} ${yr}`;
+  }
+  const m = name.match(/^(.*?)(\d+)\s*$/);
+  if (m) return `${m[1]}${parseInt(m[2], 10) + 1}`;
+  return name ? `${name} 2` : 'New season';
+}
+
+// day X of 14 (clamped) from the active season's start
+function seasonDay() {
+  const startMs = state.season ? new Date(state.season.starts_at).getTime() : Date.now();
+  return Math.min(SEASON_LEN_DAYS, Math.max(1, Math.floor((Date.now() - startMs) / 86400000) + 1));
+}
+
+// ---------- season control panel (design direction 3a — the operator console) ----------
+function buildSeasonControl() {
+  const cur = state.season;
+  const len = SEASON_LEN_DAYS;
+  const dayNum = seasonDay();
+  const daysLeft = Math.max(0, len - dayNum);
+  const pct = Math.round(dayNum / len * 100);
+  const matchN = state.matchCounts[cur.id] || 0;
+  const leader = state.players[0];
+  const startedStr = new Date(cur.starts_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit' });
+  const pastAll = state.seasons.filter(s => !s.isActive);
+  const pastShown = state.showAllSeasons ? pastAll : pastAll.slice(0, 3);
+
+  const tile = (k, v) => `<div style="background:rgba(255,255,255,.08);border-radius:10px;padding:9px 10px"><div style="font-size:9.5px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.5)">${k}</div><div style="font-size:17px;font-weight:700;margin-top:2px;color:#fff">${v}</div></div>`;
+
+  const pastRow = (s, last) => {
+    const champ = s.champion;   // the RECORDED champion (season.champion_id), not the standings leader
+    const champRow = champ ? (state.standingsBySeason[s.id] || []).find(r => r.id === champ.id) : null;
+    const elo = champRow ? champRow.elo : '';   // the champion's own final ELO
+    return `
+    <div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:12px 0;border-bottom:${last ? 'none' : '1px solid rgba(25,25,25,.07)'}">
+      <div style="min-width:0">
+        <div style="font-size:14px;font-weight:700;color:#191919">${esc(s.name)}</div>
+        <div style="font-size:11px;font-weight:300;color:rgba(25,25,25,.5);margin-top:1px">${esc(fmtDateRange(s.startsAt, s.endsAt))}</div>
+        <div style="font-size:12px;font-weight:300;color:rgba(25,25,25,.7);display:flex;align-items:center;gap:5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><i class="ph-fill ph-crown" style="color:#FAB005;font-size:13px;flex-shrink:0"></i><b style="font-weight:700;color:#191919">${esc(champ ? champ.name : '—')}</b>${elo ? ' &middot; ' + elo : ''}</div>
+      </div>
+      <button class="tap" data-action="edit-season" data-id="${esc(s.id)}" title="Rename season" style="width:34px;height:34px;border-radius:999px;border:1.5px solid rgba(25,25,25,.14);background:#fff;display:flex;align-items:center;justify-content:center;color:#191919;flex-shrink:0"><i class="ph-bold ph-pencil-simple" style="font-size:15px"></i></button>
+      <button class="tap" data-action="rebuild-season" data-id="${esc(s.id)}" title="Rebuild standings" style="width:34px;height:34px;border-radius:999px;border:1.5px solid rgba(25,25,25,.14);background:#fff;display:flex;align-items:center;justify-content:center;color:#191919;flex-shrink:0"><i class="ph-bold ph-arrows-clockwise" style="font-size:15px"></i></button>
+    </div>`;
+  };
+
+  return `
+    <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin-bottom:8px">Season control</div>
+    <div style="background:#191919;border-radius:16px;padding:16px;color:#fff">
+      <div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:999px;background:#4ADE80;box-shadow:0 0 0 4px rgba(74,222,128,.2)"></span><span style="font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#4ADE80">Live season</span></div>
+      <div style="font-size:26px;font-weight:700;margin-top:8px;letter-spacing:-.3px">${esc(cur.name)}</div>
+      <div style="font-size:12px;font-weight:300;color:rgba(255,255,255,.6);margin-top:1px">Started ${esc(startedStr)} &middot; runs ${len} days</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px">
+        ${tile('Day', dayNum + '<span style="font-size:11px;font-weight:300;color:rgba(255,255,255,.5)">/' + len + '</span>')}
+        ${tile('Matches', matchN)}
+        <div style="background:rgba(255,255,255,.08);border-radius:10px;padding:9px 10px"><div style="font-size:9.5px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.5)">Leading</div><div style="font-size:13px;font-weight:700;margin-top:4px;display:flex;align-items:center;gap:4px;color:#fff"><i class="ph-fill ph-crown" style="color:#FAB005;font-size:13px"></i>${esc(leader ? first(leader.name) : '—')}</div></div>
+      </div>
+      <div style="margin-top:13px;height:6px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden"><div style="width:${pct}%;height:100%;background:#4ADE80"></div></div>
+      <div style="font-size:10.5px;font-weight:300;color:rgba(255,255,255,.55);margin-top:6px">${daysLeft > 0 ? daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ' left in the run' : 'Final day of the run'}</div>
+    </div>
+    <button class="tap" data-action="open-start-season" style="width:100%;height:48px;margin-top:12px;border:none;border-radius:999px;background:#006BD6;color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-flag-checkered" style="font-size:18px"></i>Start new season</button>
+    ${pastAll.length ? `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:22px 0 2px"><span style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5)">Past seasons</span><span style="font-size:11px;font-weight:700;color:rgba(25,25,25,.4)">${pastAll.length} total</span></div>
+    ${pastShown.map((s, i) => pastRow(s, i === pastShown.length - 1)).join('')}
+    ${pastAll.length > 3 ? `<button class="tap" data-action="toggle-all-seasons" style="display:block;width:100%;text-align:center;border:none;background:transparent;font-size:12px;font-weight:700;color:#006BD6;margin-top:12px;padding:4px">${state.showAllSeasons ? 'Show fewer' : 'Show all ' + pastAll.length + ' seasons'}</button>` : ''}` : ''}
+    <div style="height:1px;background:rgba(25,25,25,.1);margin:22px 0"></div>`;
+}
+
+// ---------- Hall of Fame ----------
+function viewHall() {
+  const past = state.seasons.filter(s => !s.isActive);
+  const title = `
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2px">
+      <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0;letter-spacing:-.5px">Hall of Fame</h1>
+      <span style="font-size:12px;font-weight:700;color:#006BD6;text-transform:uppercase;letter-spacing:.8px">${state.seasons.length} season${state.seasons.length === 1 ? '' : 's'}</span>
+    </div>
+    <p style="margin:0 0 16px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Past champions &amp; frozen standings</p>`;
+
+  if (!past.length) {
+    return `<div style="padding:20px 16px 28px">${title}
+      <div style="background:#fff;border:1px solid var(--hairline);border-radius:16px;padding:34px 20px;text-align:center">
+        <div style="width:56px;height:56px;border-radius:16px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i class="ph ph-trophy" style="color:rgba(25,25,25,.35);font-size:30px"></i></div>
+        <div style="font-size:16px;font-weight:700;color:#191919">No past seasons yet</div>
+        <div style="font-size:13px;color:rgba(25,25,25,.55);font-weight:300;margin-top:4px">When the admin rolls the first season, its champion and final board are enshrined here.</div>
+      </div></div>`;
+  }
+
+  const sel = past.find(s => s.id === state.hallSeason) || past[0];
+  const chips = past.map(s => {
+    const on = s.id === sel.id;
+    return `<button class="tap" data-action="set-hall-season" data-id="${esc(s.id)}" style="height:34px;padding:0 14px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap;flex-shrink:0;border:1.5px solid ${on ? '#191919' : 'rgba(25,25,25,.15)'};background:${on ? '#191919' : '#fff'};color:${on ? '#fff' : '#191919'}">${esc(s.name)}</button>`;
+  }).join('');
+
+  const standings = state.standingsBySeason[sel.id] || [];
+  const rows = standings.map((p, i) => {
+    // crown the RECORDED champion (may differ from the ELO leader after a no-recrown
+    // rebuild or a top-of-table tie); fall back to position if none is recorded
+    const champ = sel.championId ? (p.id === sel.championId) : (i === 0);
+    return `<div style="display:grid;grid-template-columns:26px 34px 1fr auto;gap:11px;align-items:center;padding:11px 8px;border-radius:${champ ? '12px' : '0'};background:${champ ? 'rgba(250,176,5,.1)' : 'transparent'};border-bottom:${champ ? 'none' : '1px solid rgba(25,25,25,.07)'};margin:0 -8px">
+      <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${champ ? '#FAB005' : 'rgba(25,25,25,.5)'};text-align:center">${champ ? '<i class="ph-fill ph-crown" style="font-size:16px"></i>' : (i + 1)}</div>
+      <div style="width:34px;height:34px;border-radius:999px;background:${p.color};color:${p.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;${champ ? 'border:2px solid #FAB005' : ''}">${esc(p.initials)}</div>
+      <div><div style="font-size:14px;font-weight:700;color:#191919">${esc(p.name)}</div><div style="font-family:var(--font-mono);font-size:11px;font-weight:300;color:rgba(25,25,25,.5)">${p.wins}&ndash;${p.losses}</div></div>
+      <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#191919">${p.elo}</div>
+    </div>`;
+  }).join('') || `<div style="padding:20px;text-align:center;font-size:13px;font-weight:300;color:rgba(25,25,25,.5)">No standings recorded for this season.</div>`;
+
+  return `
+  <div style="padding:20px 16px 28px">
+    ${title}
+    <div class="app-scroll" style="display:flex;gap:8px;overflow-x:auto;margin:4px -16px 4px;padding:0 16px 4px">${chips}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+      <div style="font-size:12px;font-weight:300;color:rgba(25,25,25,.55)">${esc(fmtDateRange(sel.startsAt, sel.endsAt))} &middot; ${state.matchCounts[sel.id] || 0} matches</div>
+      <button class="tap" data-action="hall-view-feed" data-id="${esc(sel.id)}" style="border:none;background:transparent;font-size:12px;font-weight:700;color:#006BD6">View feed &rarr;</button>
+    </div>
+    <div style="margin-top:6px">${rows}</div>
+  </div>`;
+}
+
 // ---------- admin ----------
 const REASON_LABELS = { score: 'Wrong score', nothappen: 'Match never happened', wrongplayer: 'Wrong player', other: 'Other' };
 
@@ -875,7 +1099,9 @@ function viewAdmin() {
   return `
   <div style="padding:20px 16px 28px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><i class="ph-fill ph-shield-check" style="color:#006BD6;font-size:24px"></i><h1 style="font-size:28px;font-weight:700;color:#191919;margin:0;letter-spacing:-.5px">Admin</h1></div>
-    <p style="margin:0 0 20px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Only you see this tab. Disputes and sign-in claims land here.</p>
+    <p style="margin:0 0 20px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">Only you see this tab. Season control, disputes and sign-in claims land here.</p>
+
+    ${buildSeasonControl()}
 
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#191919">Disputes</span><span style="font-size:11px;font-weight:900;background:#FDECEF;color:#D1334A;border-radius:999px;padding:1px 8px">${disputes.length}</span></div>
     ${disputes.length ? `<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">${disputeCards}</div>`
@@ -1124,6 +1350,103 @@ function renderDispute() {
   </div>`;
 }
 
+// ---------- season dialogs (start / rename / rebuild) ----------
+function renderSeason() {
+  const m = state.seasonModal;
+  if (!m || !isAdmin()) { $('season').innerHTML = ''; return; }
+  let inner = '';
+
+  if (m === 'start') {
+    const cur = state.season;
+    const len = SEASON_LEN_DAYS;
+    const dayNum = seasonDay();
+    const leader = state.players[0];
+    const nm = state.seasonName;
+    const early = dayNum < len;
+    const receipt = (icon, color, html) => `<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid rgba(25,25,25,.08)"><i class="ph-fill ${icon}" style="color:${color};font-size:18px;margin-top:1px;flex-shrink:0"></i><div style="font-size:13px;font-weight:300;color:#191919;line-height:19px">${html}</div></div>`;
+    inner = `
+      <div style="font-size:18px;font-weight:700;color:#191919">Start a new season?</div>
+      <div style="font-size:13px;font-weight:300;color:rgba(25,25,25,.6);margin:2px 0 14px">Closes ${esc(cur.name)} and opens a fresh board. Name it first:</div>
+      <label style="display:block;font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:rgba(25,25,25,.5);margin-bottom:6px">New season name</label>
+      <input id="season-name-input" value="${esc(nm)}" placeholder="Name this season" style="width:100%;height:48px;border:1.5px solid #006BD6;border-radius:12px;padding:0 14px;font-size:15px;font-weight:700;color:#191919;outline:none;box-shadow:0 0 0 3px rgba(0,107,214,.12)" />
+      <div style="font-size:11.5px;font-weight:300;color:rgba(25,25,25,.5);margin:5px 0 14px">Suggested from the last one &mdash; edit freely.</div>
+      ${receipt('ph-flag-checkered', '#191919', `<b style="font-weight:700">${esc(cur.name)} closes</b> and is frozen for the Hall of Fame.`)}
+      ${receipt('ph-crown', '#FAB005', leader ? `<b style="font-weight:700">${esc(first(leader.name))} is crowned</b> champion of ${esc(cur.name)} (${leader.elo}).` : 'The current leader is crowned champion.')}
+      ${receipt('ph-arrows-counter-clockwise', '#006BD6', `All <b style="font-weight:700">${state.players.length} players reset to 1000</b> for the new season.`)}
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:11px 0"><i class="ph-fill ph-confetti" style="color:#DA2381;font-size:18px;margin-top:1px;flex-shrink:0"></i><div style="font-size:13px;font-weight:300;color:#191919;line-height:19px">Every player sees the <b style="font-weight:700">podium reveal</b> on their next visit.</div></div>
+      ${early ? `<div style="background:#FFF7E0;border:1px solid rgba(250,176,5,.4);border-radius:10px;padding:10px 12px;display:flex;gap:8px;margin-top:4px"><i class="ph-fill ph-warning" style="color:#946A00;font-size:16px;flex-shrink:0"></i><div style="font-size:12px;font-weight:300;color:#946A00;line-height:17px"><b style="font-weight:700">Only day ${dayNum} of ${len}.</b> Seasons usually run the full length &mdash; roll early only if you mean to.</div></div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:14px"><button class="tap" data-action="close-season-modal" style="flex:1;height:44px;border:1.5px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;font-size:14px;font-weight:700;color:#191919">Cancel</button><button class="tap" data-action="confirm-start-season" ${state.busy ? 'disabled' : ''} style="flex:1.5;height:44px;border:none;background:#006BD6;border-radius:999px;font-size:14px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 10px">Start &ldquo;${esc(nm || nextSeasonName())}&rdquo;</button></div>`;
+  } else if (m.edit) {
+    const s = state.seasons.find(x => x.id === m.edit);
+    const nm = state.seasonName;
+    inner = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><i class="ph-fill ph-pencil-simple" style="color:#006BD6;font-size:19px"></i><div style="font-size:17px;font-weight:700;color:#191919">Edit season</div></div>
+      <label style="display:block;font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:rgba(25,25,25,.5);margin-bottom:6px">Name</label>
+      <input id="season-name-input" value="${esc(nm)}" placeholder="Season name" style="width:100%;height:48px;border:1.5px solid #006BD6;border-radius:12px;padding:0 14px;font-size:15px;font-weight:700;color:#191919;outline:none;box-shadow:0 0 0 3px rgba(0,107,214,.12)" />
+      <div style="font-size:11.5px;font-weight:300;color:rgba(25,25,25,.5);margin-top:5px">Was &ldquo;${esc(s ? s.name : '')}&rdquo; &middot; shows everywhere this season appears (${esc(s ? fmtDateRange(s.startsAt, s.endsAt) : '')}).</div>
+      <div style="display:flex;gap:8px;margin-top:16px"><button class="tap" data-action="close-season-modal" style="flex:1;height:44px;border:1.5px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;font-size:14px;font-weight:700;color:#191919">Cancel</button><button class="tap" data-action="save-edit-season" ${state.busy ? 'disabled' : ''} style="flex:1.4;height:44px;border:none;background:#006BD6;border-radius:999px;font-size:14px;font-weight:700;color:#fff">Save changes</button></div>`;
+  } else if (m.rebuild) {
+    const s = state.seasons.find(x => x.id === m.rebuild);
+    inner = `
+      <div style="display:flex;align-items:center;gap:8px"><i class="ph-fill ph-arrows-clockwise" style="color:#006BD6;font-size:20px"></i><div style="font-size:18px;font-weight:700;color:#191919">Rebuild ${esc(s ? s.name : 'season')}?</div></div>
+      <div style="font-size:13px;font-weight:300;color:rgba(25,25,25,.6);margin:6px 0 12px;line-height:19px">Replays every non-voided match of that season from 1000 and rewrites its standings. Use this after correcting or moving a match.</div>
+      <div style="background:#F5F5F5;border-radius:12px;padding:12px 14px"><div style="font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:rgba(25,25,25,.5);margin-bottom:8px">If the top spot changes</div><button class="tap" data-action="toggle-recrown" style="display:flex;align-items:flex-start;gap:10px;background:transparent;border:none;text-align:left;padding:0;width:100%"><span style="width:38px;height:22px;border-radius:999px;background:${state.recrown ? '#006BD6' : 'rgba(25,25,25,.25)'};flex-shrink:0;position:relative;margin-top:1px;transition:background .15s"><span style="position:absolute;top:2px;${state.recrown ? 'right:2px' : 'left:2px'};width:18px;height:18px;border-radius:999px;background:#fff"></span></span><span style="font-size:13px;font-weight:300;color:#191919;line-height:19px"><b style="font-weight:700">Re-crown automatically</b> &mdash; if the champion changes, re-freeze the new winner and update the Hall of Fame.</span></button></div>
+      <div style="background:#FDECEF;border-left:3px solid #D1334A;border-radius:0 8px 8px 0;padding:9px 12px;margin-top:12px;font-size:12px;font-weight:300;color:#191919;line-height:17px">A rebuild can quietly change who won a past season. It&rsquo;s logged either way.</div>
+      <div style="display:flex;gap:8px;margin-top:14px"><button class="tap" data-action="close-season-modal" style="flex:1;height:44px;border:1.5px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;font-size:14px;font-weight:700;color:#191919">Cancel</button><button class="tap" data-action="confirm-rebuild" ${state.busy ? 'disabled' : ''} style="flex:1.4;height:44px;border:none;background:#191919;border-radius:999px;font-size:14px;font-weight:700;color:#fff">Rebuild season</button></div>`;
+  }
+
+  $('season').innerHTML = `
+  <div data-action="season-backdrop" style="position:fixed;inset:0;z-index:82;background:rgba(25,25,25,.42);display:flex;flex-direction:column;justify-content:flex-end;max-width:480px;margin:0 auto">
+    <div data-stop="1" style="background:#fff;border-radius:24px 24px 0 0;padding:20px 20px 26px;animation:toastIn .22s var(--ease);max-height:92%;overflow-y:auto">${inner}</div>
+  </div>`;
+}
+
+// keep the name input's value + caret across re-renders (whole sheet is an innerHTML string)
+function wireSeasonName() {
+  const el = $('season-name-input');
+  if (!el) return;
+  el.addEventListener('input', () => { state.seasonName = el.value; });
+  el.focus();
+  const n = el.value.length;
+  try { el.setSelectionRange(n, n); } catch (e) {}
+}
+
+// ---------- podium reveal (design direction 1c — the Podium Show) ----------
+function renderPodium() {
+  const closed = lastClosedSeason();
+  if (!state.podium || !closed) { $('podium').innerHTML = ''; return; }
+  const top3 = (state.standingsBySeason[closed.id] || []).slice(0, 3);
+  const closedName = closed.name;
+  const newName = state.season.name;
+
+  const col = (p, rank, cfg) => p ? `
+    <div class="en-col" style="flex:1;text-align:center;animation-delay:${cfg.delay}s">
+      ${rank === 1 ? '<i class="ph-fill ph-crown" style="color:#FAB005;font-size:30px;display:block;margin-bottom:2px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))"></i>' : ''}
+      <div style="width:${cfg.av}px;height:${cfg.av}px;border-radius:999px;background:${p.color};color:${p.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${cfg.avf}px;margin:0 auto 8px;border:3px solid ${cfg.ring}${rank === 1 ? ';box-shadow:0 0 30px rgba(250,176,5,.5)' : ''}">${esc(p.initials)}</div>
+      <div style="font-size:${rank === 1 ? 13 : 12}px;font-weight:700;color:#fff">${esc(first(p.name))}</div>
+      <div style="font-family:var(--font-mono);font-size:${rank === 1 ? 12 : 11}px;font-weight:700;color:${cfg.ring}">${p.elo}</div>
+      <div class="en-bar" style="margin-top:8px;height:${cfg.h}px;background:${cfg.bar};border-radius:10px 10px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-family:var(--font-body);font-size:${cfg.num}px;font-weight:900;color:${cfg.numc};animation-delay:${cfg.delay}s">${rank}</div>
+    </div>` : '<div style="flex:1"></div>';
+
+  const conf = ['12%,#FAB005,.1', '30%,#006BD6,.8', '50%,#fff,.4', '68%,#DA2381,1.3', '86%,#008928,.6'].map(c => {
+    const [l, bg, d] = c.split(',');
+    return `<span class="cf" style="left:${l};width:8px;height:12px;background:${bg};animation-delay:${d}s"></span>`;
+  }).join('');
+
+  $('podium').innerHTML = `
+  <div style="position:fixed;inset:0;z-index:88;overflow:hidden;background:radial-gradient(120% 80% at 50% 0%,#12294A 0%,#08152A 60%,#050D1C 100%);max-width:480px;margin:0 auto">
+    <div style="position:absolute;top:-40px;left:50%;transform:translateX(-50%);width:280px;height:360px;background:radial-gradient(ellipse at top,rgba(250,176,5,.28),transparent 70%);pointer-events:none"></div>
+    ${conf}
+    <div style="position:relative;text-align:center;padding:38px 24px 0"><div class="en-up" style="font-size:12px;font-weight:900;letter-spacing:2.5px;color:#FAB005;text-transform:uppercase;animation-delay:.1s">${esc(closedName)} &middot; The podium</div><div class="en-fade" style="font-size:15px;font-weight:300;color:rgba(255,255,255,.7);margin-top:6px;animation-delay:.5s">Counting down the top three&hellip;</div></div>
+    <div style="position:absolute;bottom:150px;left:0;right:0;display:flex;align-items:flex-end;justify-content:center;gap:12px;padding:0 22px">
+      ${col(top3[1], 2, { delay: 1.9, av: 56, avf: 17, ring: '#C7CDD4', h: 90, bar: 'linear-gradient(180deg,#2A4468,#1A2E4C)', num: 22, numc: '#C7CDD4' })}
+      ${col(top3[0], 1, { delay: 3.1, av: 72, avf: 22, ring: '#FAB005', h: 132, bar: 'linear-gradient(180deg,#FAB005,#C98A00)', num: 30, numc: '#4A3400' })}
+      ${col(top3[2], 3, { delay: 0.85, av: 52, avf: 16, ring: '#E8A06B', h: 70, bar: 'linear-gradient(180deg,#5A3A2A,#3E2719)', num: 20, numc: '#E8A06B' })}
+    </div>
+    <div class="en-up" style="position:absolute;bottom:0;left:0;right:0;padding:18px 22px 26px;background:linear-gradient(180deg,transparent,rgba(5,13,28,.9) 40%);animation-delay:4.1s"><div style="text-align:center;font-size:13px;font-weight:300;color:rgba(255,255,255,.8);margin-bottom:12px">${esc(newName)} begins &middot; everyone back to <strong style="font-weight:700;color:#fff">1000</strong></div><button class="tap" data-action="dismiss-podium" style="width:100%;border:none;background:#fff;color:#191919;font-size:15px;font-weight:700;border-radius:999px;padding:14px">Enter ${esc(newName)}</button></div>
+  </div>`;
+}
+
 // ---------- toast ----------
 function renderToast() {
   $('toast').innerHTML = state.toast ? `
@@ -1143,11 +1466,11 @@ function showToast(text) {
 // "undo the last in-app step" instead of leaving the page. A single trapped
 // history entry acts as the back signal; navStack holds the real screen depth.
 let navStack = [];
-const snapshot = () => ({ screen: state.screen, profileId: state.profileId });
+const snapshot = () => ({ screen: state.screen, profileId: state.profileId, feedSeason: state.feedSeason });
 
 function anyOverlayOpen() {
   return state.avatarMenu || !!state.disputeFor || !!state.pickerOpen ||
-    !!state.openPicker || state.byPlayerRowOpen;
+    !!state.openPicker || state.byPlayerRowOpen || !!state.seasonModal;
 }
 function closeOverlays() {
   state.avatarMenu = false;
@@ -1155,11 +1478,17 @@ function closeOverlays() {
   state.pickerOpen = null; state.logSearch = '';
   state.openPicker = null;
   state.byPlayerRowOpen = false;
+  state.seasonModal = null;
 }
 function applyView(view) {
   closeOverlays();
+  state.feedSeason = view.feedSeason || null;
   if (view.screen === 'profile' && view.profileId) { openProfile(view.profileId, false); }
-  else { state.screen = view.screen; state.profileId = view.profileId || null; render(); }
+  else {
+    state.screen = view.screen; state.profileId = view.profileId || null;
+    render();
+    if (state.feedSeason) loadPastFeed(state.feedSeason).then(render);   // rehydrate a restored past feed
+  }
 }
 // returns true if it consumed a back step, false if there's nothing left to undo
 function handleBack() {
@@ -1176,10 +1505,14 @@ const actions = {
     if (s === 'profile') { openProfile(state.identity); return; }
     if (s !== state.screen) navStack.push(snapshot());
     state.screen = s;
+    if (s === 'feed') state.feedSeason = null;   // the Feed tab always lands on the live season
     state.pickerOpen = null;
     state.openPicker = null;
     state.byPlayerRowOpen = false;
     render();
+    // Admin/Hall read season history, which refreshData skips on other screens —
+    // pull it fresh on tab-open so a roll/rebuild done elsewhere shows up.
+    if (s === 'admin' || s === 'hall') refreshData().then(render).catch(e => console.error(e));
   },
   'open-profile': el => openProfile(el.dataset.id),
   'my-profile': () => { state.avatarMenu = false; openProfile(state.identity); },
@@ -1294,6 +1627,7 @@ const actions = {
       await refreshData();
       navStack.push(snapshot());
       state.screen = 'feed';
+      state.feedSeason = null;   // show the live feed where the new match just landed
       state.pickerOpen = null;
       state.logSearch = '';
       state.scoreA = 11; state.scoreB = 0; state.logB = null;
@@ -1303,6 +1637,24 @@ const actions = {
       console.error(err);
     } finally { state.busy = false; render(); }
   },
+  // ---- feed season selector ----
+  'set-feed-season': async el => {
+    const id = el.dataset.id;
+    state.feedSeason = (id === state.season.id) ? null : id;
+    state.feedFilter = 'all'; state.byPlayerRowOpen = false; state.openPicker = null;
+    render();
+    if (state.feedSeason) { await loadPastFeed(state.feedSeason); render(); }
+  },
+  'hall-view-feed': async el => {
+    const id = el.dataset.id;
+    if (state.screen !== 'feed') navStack.push(snapshot());
+    state.feedSeason = (id === state.season.id) ? null : id;
+    state.feedFilter = 'all'; state.byPlayerRowOpen = false; state.openPicker = null;
+    state.screen = 'feed';
+    render();
+    if (state.feedSeason) { await loadPastFeed(state.feedSeason); render(); }
+  },
+
   // ---- feed filters + reactions ----
   'set-filter': el => { state.feedFilter = el.dataset.f; state.byPlayerRowOpen = false; state.openPicker = null; render(); },
   'toggle-byplayer': () => { state.byPlayerRowOpen = !state.byPlayerRowOpen; state.openPicker = null; render(); },
@@ -1417,6 +1769,79 @@ const actions = {
       console.error(err);
     } finally { state.busy = false; render(); }
   },
+
+  // ---- seasons: Hall ----
+  'set-hall-season': el => { state.hallSeason = el.dataset.id; render(); },
+
+  // ---- seasons: admin control panel + dialogs ----
+  'open-start-season': () => { state.seasonModal = 'start'; state.seasonName = nextSeasonName(); render(); },
+  'close-season-modal': () => { state.seasonModal = null; render(); },
+  'season-backdrop': () => { state.seasonModal = null; render(); },
+  'toggle-all-seasons': () => { state.showAllSeasons = !state.showAllSeasons; render(); },
+  'toggle-recrown': () => { state.recrown = !state.recrown; render(); },
+  'confirm-start-season': async () => {
+    if (state.busy) return;
+    state.busy = true; render();
+    try {
+      const res = await api.rollSeason((state.seasonName || '').trim() || nextSeasonName());
+      state.seasonModal = null; state.showAllSeasons = false;
+      state.season = await api.getActiveSeason();   // full row (starts_at etc.) for the panel
+      state.feedSeason = null; state.pastFeeds = {};// last season is now closed; drop stale feeds
+      state.screen = 'admin';
+      await refreshData();
+      showToast(res.name + ' is live — everyone reset to 1000');
+    } catch (err) {
+      showToast(err.message || 'Could not start the season');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+  'edit-season': el => {
+    const s = state.seasons.find(x => x.id === el.dataset.id);
+    state.seasonModal = { edit: el.dataset.id };
+    state.seasonName = s ? s.name : '';
+    render();
+  },
+  'save-edit-season': async () => {
+    const m = state.seasonModal;
+    if (!m || !m.edit || state.busy) return;
+    state.busy = true; render();
+    try {
+      await api.renameSeason(m.edit, (state.seasonName || '').trim());
+      state.seasonModal = null;
+      await refreshData();
+      showToast('Season renamed');
+    } catch (err) {
+      showToast(err.message || 'Could not rename');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+  'rebuild-season': el => { state.seasonModal = { rebuild: el.dataset.id }; state.recrown = true; render(); },
+  'confirm-rebuild': async () => {
+    const m = state.seasonModal;
+    if (!m || !m.rebuild || state.busy) return;
+    const recrown = state.recrown;
+    state.busy = true; render();
+    try {
+      await api.rebuildSeason(m.rebuild, recrown);
+      state.seasonModal = null;
+      delete state.pastFeeds[m.rebuild];   // rebuild rewrote elo_delta; drop the cached feed
+      await refreshData();
+      showToast(recrown ? 'Rebuilt — champion re-checked' : 'Standings rebuilt');
+    } catch (err) {
+      showToast(err.message || 'Could not rebuild');
+      console.error(err);
+    } finally { state.busy = false; render(); }
+  },
+  'dismiss-podium': async () => {
+    state.podium = false;
+    render();
+    try {
+      await api.seeSeason(state.season.id);
+      // reflect the persisted last_seen locally so a refresh mid-session won't re-trigger
+      const m = me();
+      if (m) m.lastSeenSeason = state.season.id;
+    } catch (err) { console.error(err); }
+  },
 };
 
 // Optimistic reaction bump, then persist. New keys (lol/angry/rage/poop) need
@@ -1452,7 +1877,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
   // clicks inside a menu/sheet card shouldn't fall through to the backdrop's close action
-  if (stop && (el.dataset.action === 'menu-backdrop' || el.dataset.action === 'dispute-backdrop')) return;
+  if (stop && (el.dataset.action === 'menu-backdrop' || el.dataset.action === 'dispute-backdrop' || el.dataset.action === 'season-backdrop')) return;
   const fn = actions[el.dataset.action];
   if (fn) fn(el);
 });
@@ -1470,7 +1895,7 @@ function scheduleRefresh() {
     try {
       await refreshData();
       const a = document.activeElement;
-      if (!a || (!a.dataset.draft && a.id !== 'new-name' && a.id !== 'auth-email' && a.id !== 'opp-search')) render();
+      if (!a || (!a.dataset.draft && a.id !== 'new-name' && a.id !== 'auth-email' && a.id !== 'opp-search' && a.id !== 'season-name-input')) render();
     } catch (e) { console.error(e); }
   }, 400);
 }
@@ -1489,10 +1914,12 @@ function scheduleRefresh() {
     const session = await api.getSession();
     await resolveSession(session);
     if (state.identity) { try { await refreshData(); } catch (e) { console.error(e); } }
+    maybeShowPodium();   // on load: reveal the podium once if a roll happened since last visit
     // react to magic-link redirect completing, or sign-out, in any tab
     api.onAuthChange(async newSession => {
       await resolveSession(newSession);
       try { await refreshData(); } catch (e) { console.error(e); }
+      maybeShowPodium();   // identity change: re-check for an unseen roll
       render();
     });
     api.subscribeToChanges(scheduleRefresh);

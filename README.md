@@ -11,6 +11,7 @@ Always-on ELO leaderboard for office ping pong. Static frontend (GitHub Pages) +
 - `supabase/schema.sql` — the tables + RLS + realtime publication (includes trust-wave columns for fresh installs)
 - `supabase/functions.sql` — `log_match` (server-side ELO), `correct_match` (void/edit + full-season replay), `roll_season`, plus the trust-wave functions (`dispute_match`, `resolve_dispute`, `approve_claim`/`reject_claim`, …)
 - `supabase/migrations/001_trust_wave.sql` — additive migration that upgrades a **live** MVP database to the trust wave (run once)
+- `supabase/migrations/002_seasons.sql` — additive migration for the seasons feature (`last_seen_season`, one-active-season guard, client-driven season functions); re-run `functions.sql` after it
 - `supabase/seed.sql` — opens the first season
 
 ## Setup (once)
@@ -32,10 +33,13 @@ Run from the Supabase SQL editor:
 -- void or edit a match (then full-season replay):
 select correct_match('<admin secret>', '<match id>', 'void');
 select correct_match('<admin secret>', '<match id>', 'edit', null, null, 11, 7);
-
--- close the quarter and open the next:
-select roll_season('<admin secret>', '2026-q4', 'Q4 2026');
 ```
+
+Rolling a season is now done from the app's **Admin tab → Season control** (a signed-in
+admin, no secret). The season functions are admin-JWT'd — `roll_season(name)` closes the
+live season, crowns its champion, opens a fresh board named `name`, and resets everyone to
+1000; `rename_season(id, name)` renames any season; `rebuild_season(id, recrown)` replays a
+season's non-voided matches and optionally re-crowns. See the seasons handoff bundle.
 
 ## Trust wave (wave 1: trust & identity)
 
