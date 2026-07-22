@@ -26,8 +26,11 @@
 
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--gray-100);font-family:var(--font-body);color:var(--ink)}
-button{font-family:var(--font-body);cursor:pointer}
+/* Disable iOS double-tap-to-zoom (and the legacy 300ms tap delay) so fast taps
+   on the score +/- buttons register instead of zooming the page. Pinch-zoom is
+   preserved. Android already behaves this way. */
+body{background:var(--gray-100);font-family:var(--font-body);color:var(--ink);touch-action:manipulation}
+button{font-family:var(--font-body);cursor:pointer;touch-action:manipulation}
 input{font-family:var(--font-body)}
 button:disabled{cursor:default}
 

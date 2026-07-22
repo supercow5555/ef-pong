@@ -814,7 +814,7 @@ function viewProfile() {
 
   return `
   <div style="padding:16px 16px 28px">
-    <button class="tap" data-action="nav" data-screen="leaderboard" style="border:none;background:transparent;display:flex;align-items:center;gap:6px;color:rgba(25,25,25,.6);font-size:14px;font-weight:700;padding:4px 0;margin-bottom:8px"><i class="ph-bold ph-arrow-left" style="font-size:17px"></i>Leaderboard</button>
+    <button class="tap" data-action="back" style="border:none;background:transparent;display:flex;align-items:center;gap:6px;color:rgba(25,25,25,.6);font-size:14px;font-weight:700;padding:4px 0;margin-bottom:8px"><i class="ph-bold ph-arrow-left" style="font-size:17px"></i>Back</button>
     <div style="background:#fff;border:1px solid var(--hairline);border-radius:20px;padding:20px;text-align:center;box-shadow:0 8px 24px -16px rgba(25,25,25,.4)">
       <div style="width:76px;height:76px;border-radius:999px;background:${pp.color};color:${pp.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;margin:0 auto 10px">${esc(pp.initials)}</div>
       <div style="font-size:22px;font-weight:700;color:#191919;line-height:1.1">${esc(pp.name)}</div>
@@ -1138,11 +1138,43 @@ function showToast(text) {
   toastTimer = setTimeout(() => { state.toast = null; renderToast(); }, 2600);
 }
 
+// ---------- in-app back navigation ----------
+// The OS back button / iOS swipe-back fires popstate; we translate it into
+// "undo the last in-app step" instead of leaving the page. A single trapped
+// history entry acts as the back signal; navStack holds the real screen depth.
+let navStack = [];
+const snapshot = () => ({ screen: state.screen, profileId: state.profileId });
+
+function anyOverlayOpen() {
+  return state.avatarMenu || !!state.disputeFor || !!state.pickerOpen ||
+    !!state.openPicker || state.byPlayerRowOpen;
+}
+function closeOverlays() {
+  state.avatarMenu = false;
+  state.disputeFor = null; state.disputeReason = null;
+  state.pickerOpen = null; state.logSearch = '';
+  state.openPicker = null;
+  state.byPlayerRowOpen = false;
+}
+function applyView(view) {
+  closeOverlays();
+  if (view.screen === 'profile' && view.profileId) { openProfile(view.profileId, false); }
+  else { state.screen = view.screen; state.profileId = view.profileId || null; render(); }
+}
+// returns true if it consumed a back step, false if there's nothing left to undo
+function handleBack() {
+  if (anyOverlayOpen()) { closeOverlays(); render(); return true; }
+  if (navStack.length) { applyView(navStack.pop()); return true; }
+  return false;
+}
+
 // ---------- actions ----------
 const actions = {
+  'back': () => history.back(),   // on-screen back → same path as the OS gesture
   'nav': el => {
     const s = el.dataset.screen;
     if (s === 'profile') { openProfile(state.identity); return; }
+    if (s !== state.screen) navStack.push(snapshot());
     state.screen = s;
     state.pickerOpen = null;
     state.openPicker = null;
@@ -1221,6 +1253,7 @@ const actions = {
     try { await api.signOut(); } catch (e) {}
     state.identity = null; state.pending = false; state.session = null;
     state.authStep = 'email'; state.authEmail = ''; state.screen = 'leaderboard';
+    navStack = [];
     render();
   },
 
@@ -1259,6 +1292,7 @@ const actions = {
       });
       const wName = first(P(aWon ? logA : logB).name);
       await refreshData();
+      navStack.push(snapshot());
       state.screen = 'feed';
       state.pickerOpen = null;
       state.logSearch = '';
@@ -1394,9 +1428,11 @@ async function applyReaction(id, kind) {
   try { await api.addReaction(id, kind); } catch (err) { console.error(err); }
 }
 
-async function openProfile(id) {
+async function openProfile(id, push = true) {
   state.avatarMenu = false;
   if (!id) { state.screen = 'profile'; render(); return; }
+  // remember where we came from so back returns there (not when re-opening via back)
+  if (push && !(state.screen === 'profile' && state.profileId === id)) navStack.push(snapshot());
   state.screen = 'profile';
   state.profileId = id;
   state.profileData = null;
@@ -1467,4 +1503,12 @@ function scheduleRefresh() {
     console.error(err);
   }
   render();
+
+  // Trap one history entry as the back signal. On back (button or iOS swipe),
+  // undo the last in-app step; re-arm if we did, otherwise let the app close.
+  history.pushState({ app: 1 }, '');
+  window.addEventListener('popstate', () => {
+    if (handleBack()) history.pushState({ app: 1 }, '');
+    else history.back();
+  });
 })();
