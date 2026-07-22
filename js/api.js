@@ -35,12 +35,56 @@ export async function getActiveSeason() {
   return data;
 }
 
+// All seasons + their frozen standings + a match tally, in one small fan-out.
+// Powers the admin season-control panel, the Hall of Fame, and the podium reveal.
+// Office scale is tiny (a dozen players × a handful of seasons), so reading every
+// standings row and every match's season_id is cheap.
+export async function getSeasonHistory() {
+  const [seasonsR, standingsR, matchesR] = await Promise.all([
+    supabase.from('season')
+      .select('id, name, starts_at, ends_at, champion_id, is_active, champion:player!season_champion_id_fkey(id, name, initials, avatar_color)')
+      .order('starts_at', { ascending: false }),
+    supabase.from('standings')
+      .select('season_id, elo, wins, losses, peak, player:player(id, name, initials, avatar_color)'),
+    supabase.from('match').select('season_id').eq('is_voided', false),
+  ]);
+  for (const r of [seasonsR, standingsR, matchesR]) if (r.error) throw r.error;
+
+  const standingsBySeason = {};
+  (standingsR.data || []).forEach(s => {
+    if (!s.player) return;
+    (standingsBySeason[s.season_id] ||= []).push({
+      id: s.player.id, name: s.player.name, initials: s.player.initials,
+      color: s.player.avatar_color, textColor: textColorFor(s.player.avatar_color),
+      elo: s.elo, wins: s.wins, losses: s.losses, peak: s.peak,
+    });
+  });
+  Object.values(standingsBySeason).forEach(rows =>
+    rows.sort((a, b) => b.elo - a.elo || a.name.localeCompare(b.name)));
+
+  const matchCountBySeason = {};
+  (matchesR.data || []).forEach(m => {
+    matchCountBySeason[m.season_id] = (matchCountBySeason[m.season_id] || 0) + 1;
+  });
+
+  const seasons = (seasonsR.data || []).map(s => ({
+    id: s.id, name: s.name, startsAt: s.starts_at, endsAt: s.ends_at,
+    isActive: !!s.is_active, championId: s.champion_id,
+    champion: s.champion ? {
+      id: s.champion.id, name: s.champion.name, initials: s.champion.initials,
+      color: s.champion.avatar_color, textColor: textColorFor(s.champion.avatar_color),
+    } : null,
+  }));
+
+  return { seasons, standingsBySeason, matchCountBySeason };
+}
+
 // Roster with this season's numbers. Players without a standings row yet
 // (self-registered, no matches) default to 1000 / 0-0.
 export async function getLeaderboard(seasonId) {
   const { data, error } = await supabase
     .from('player')
-    .select('id, name, initials, avatar_color, join_date, email, is_admin, standings(elo, wins, losses, peak)')
+    .select('id, name, initials, avatar_color, join_date, email, is_admin, last_seen_season, standings(elo, wins, losses, peak)')
     .eq('standings.season_id', seasonId);
   if (error) throw error;
   return data
@@ -50,6 +94,7 @@ export async function getLeaderboard(seasonId) {
         id: p.id, name: p.name, initials: p.initials,
         color: p.avatar_color, textColor: textColorFor(p.avatar_color),
         email: p.email || null, isAdmin: !!p.is_admin,
+        lastSeenSeason: p.last_seen_season || null,
         elo: s.elo, wins: s.wins, losses: s.losses, peak: s.peak,
       };
     })
@@ -97,6 +142,9 @@ export async function getFeed(seasonId, limit = 30, { includeVoided = false } = 
   });
 }
 
+// standing is the CURRENT season's ELO/W-L/peak (ratings reset each season), but the
+// match list + head-to-head are ALL-TIME: a player's career games and rivalries stay
+// visible on the profile across every season, not just the active one.
 export async function getPlayerDetail(playerId, seasonId) {
   const [standing, history, matches] = await Promise.all([
     supabase.from('standings').select('elo, wins, losses, peak')
@@ -107,7 +155,7 @@ export async function getPlayerDetail(playerId, seasonId) {
       .select(`id, winner_id, loser_id, winner_score, loser_score, elo_delta, played_at,
         winner:player!match_winner_id_fkey(id, name),
         loser:player!match_loser_id_fkey(id, name)`)
-      .eq('season_id', seasonId).eq('is_voided', false)
+      .eq('is_voided', false)
       .or(`winner_id.eq.${playerId},loser_id.eq.${playerId}`)
       .order('played_at', { ascending: false }),
   ]);
@@ -121,10 +169,11 @@ export async function getPlayerDetail(playerId, seasonId) {
 
 // The signed-in user's own matches (winner/loser ids + when), most-recent first.
 // Drives the log-a-match opponent picker: recent opponents and "n games together".
-export async function getPlayerMatches(playerId, seasonId) {
+// ALL-TIME (not season-scoped) so recent opponents / rivalries persist across seasons.
+export async function getPlayerMatches(playerId) {
   const { data, error } = await supabase.from('match')
     .select('winner_id, loser_id, played_at')
-    .eq('season_id', seasonId).eq('is_voided', false)
+    .eq('is_voided', false)
     .or(`winner_id.eq.${playerId},loser_id.eq.${playerId}`)
     .order('played_at', { ascending: false });
   if (error) throw error;
@@ -294,6 +343,39 @@ export async function getRolloutComplete() {
 
 export async function setRolloutComplete(on) {
   const { error } = await supabase.rpc('set_rollout_complete', { p_on: on });
+  if (error) throw error;
+}
+
+// ---------- seasons (admin-JWT'd server functions) ----------
+// Close the live season, crown its champion, open a fresh board named `name`,
+// reset everyone to 1000. Returns the new { id, name }.
+export async function rollSeason(name) {
+  const { data, error } = await supabase.rpc('roll_season', { p_name: name });
+  if (error) throw error;
+  return data;
+}
+
+// Pure rename of any season (live or past) — no replay.
+export async function renameSeason(seasonId, name) {
+  const { data, error } = await supabase.rpc('rename_season', {
+    p_season_id: seasonId, p_name: name,
+  });
+  if (error) throw error;
+  return data;
+}
+
+// Replay a season's non-voided matches from 1000; re-crown the champion when recrown.
+export async function rebuildSeason(seasonId, recrown) {
+  const { data, error } = await supabase.rpc('rebuild_season', {
+    p_season_id: seasonId, p_recrown: !!recrown,
+  });
+  if (error) throw error;
+  return data;
+}
+
+// Mark the podium reveal seen for the current player (so it shows once per roll).
+export async function seeSeason(seasonId) {
+  const { error } = await supabase.rpc('see_season', { p_season_id: seasonId });
   if (error) throw error;
 }
 
