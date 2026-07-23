@@ -269,6 +269,7 @@ function render() {
   renderAvatarMenu();
   renderSeason();
   renderPodium();
+  renderConfetti();
   renderToast();
   wireLogSearch();
   wireSeasonName();
@@ -1418,6 +1419,43 @@ function wireSeasonName() {
   try { el.setSelectionRange(n, n); } catch (e) {}
 }
 
+// ---------- confetti (shared: podium finale + Hall of Fame) ----------
+const CONFETTI_COLORS = ['#FAB005', '#006BD6', '#DA2381', '#008928', '#D1334A', '#ffffff', '#4ADE80'];
+// A field of `n` falling pieces. Each gets a randomized colour, size, fall speed,
+// horizontal drift and spin (via inline CSS vars) so it reads like a real burst
+// rather than a few tidy streamers. Fast durations (1.6–2.8s) make it feel movie-like.
+function confettiField(n) {
+  let s = '';
+  for (let i = 0; i < n; i++) {
+    const left = Math.round(Math.random() * 100);
+    const c = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    const w = 6 + Math.round(Math.random() * 6);           // 6–12px
+    const h = 8 + Math.round(Math.random() * 8);           // 8–16px
+    const dur = (1.6 + Math.random() * 1.2).toFixed(2);    // 1.6–2.8s — fast
+    const delay = (Math.random() * 2.2).toFixed(2);        // staggered entrance
+    const dx = Math.round(-70 + Math.random() * 140);      // horizontal drift
+    const rot = Math.round(360 + Math.random() * 900);     // spin
+    const radius = Math.random() < 0.35 ? '50%' : '1px';   // mix of dots and rectangles
+    s += `<span class="cf" style="left:${left}%;width:${w}px;height:${h}px;background:${c};border-radius:${radius};--cf-dur:${dur}s;--cf-delay:${delay}s;--cf-dx:${dx}px;--cf-rot:${rot}deg"></span>`;
+  }
+  return s;
+}
+
+// Hall of Fame gets its own celebratory confetti layer. Rendered into #confetti
+// (a fixed overlay) and rebuilt only when *entering* the Hall — so continuous
+// re-renders (e.g. tapping a season chip) don't restart the animation mid-fall.
+let confettiScreen = null;
+function renderConfetti() {
+  const show = state.screen === 'hall' && state.seasons.some(s => !s.isActive);
+  if (show && confettiScreen !== 'hall') {
+    $('confetti').innerHTML = `<div aria-hidden="true" style="position:fixed;inset:0;max-width:480px;margin:0 auto;pointer-events:none;overflow:hidden;z-index:60">${confettiField(40)}</div>`;
+    confettiScreen = 'hall';
+  } else if (!show && confettiScreen) {
+    $('confetti').innerHTML = '';
+    confettiScreen = null;
+  }
+}
+
 // ---------- podium reveal (design direction 1c — the Podium Show) ----------
 function renderPodium() {
   const closed = lastClosedSeason();
@@ -1435,10 +1473,7 @@ function renderPodium() {
       <div class="en-bar" style="margin-top:8px;height:${cfg.h}px;background:${cfg.bar};border-radius:10px 10px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-family:var(--font-body);font-size:${cfg.num}px;font-weight:900;color:${cfg.numc};animation-delay:${cfg.delay}s">${rank}</div>
     </div>` : '<div style="flex:1"></div>';
 
-  const conf = ['12%,#FAB005,.1', '30%,#006BD6,.8', '50%,#fff,.4', '68%,#DA2381,1.3', '86%,#008928,.6'].map(c => {
-    const [l, bg, d] = c.split(',');
-    return `<span class="cf" style="left:${l};width:8px;height:12px;background:${bg};animation-delay:${d}s"></span>`;
-  }).join('');
+  const conf = confettiField(70);   // dense, fast, movie-like finale
 
   $('podium').innerHTML = `
   <div style="position:fixed;inset:0;z-index:88;overflow:hidden;background:radial-gradient(120% 80% at 50% 0%,#12294A 0%,#08152A 60%,#050D1C 100%);max-width:480px;margin:0 auto">
