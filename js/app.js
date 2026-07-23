@@ -46,10 +46,11 @@ const state = {
   profileId: null,
   profileData: null,
   rivalId: null,
-  pickerOpen: null,     // 'b' | null (Player 1 is locked to the signed-in user)
-  logA: null,           // locked to state.identity
-  logB: null,           // chosen opponent
-  logSearch: '',        // opponent picker search query
+  pickerOpen: null,     // 'a' | 'b' | null — which player picker is open
+  logA: null,           // player 1 (defaults to the signed-in user, but changeable)
+  logB: null,           // player 2
+  logSearch: '',        // player-picker search query
+  confirmLog: false,    // confirm before logging a match the signed-in user isn't in
   myMatches: [],        // signed-in user's matches -> recent opponents / games-together
   scoreA: 11,
   scoreB: 0,
@@ -198,8 +199,10 @@ async function refreshData() {
   if (state.identity && !P(state.identity)) state.identity = null;
   // verified iff the player row has a bound email — auto-flips when an admin approves
   if (state.identity) state.pending = !(P(state.identity) && P(state.identity).email);
-  // Player 1 is always the signed-in user
-  state.logA = state.identity;
+  // Player 1 defaults to the signed-in user, but a spectator may change it, so
+  // only (re)set it when it's unset or points at a since-removed player — never
+  // clobber an in-progress pick on a background refresh.
+  if (state.identity && (!state.logA || !P(state.logA))) state.logA = state.identity;
   if (state.identity) {
     state.ratingEvents = await api.getRatingEvents(state.identity).catch(() => []);
     state.myMatches = await api.getPlayerMatches(state.identity).catch(() => []);
@@ -418,100 +421,99 @@ function viewLog() {
   // Signed-out (the sign-in gate overlays this screen, but render() still runs viewLog)
   if (!me()) return `<div style="padding:20px 16px 28px">${header}</div>`;
 
-  // Section A — "You" (Player 1 is locked to the signed-in player)
-  const meP = me();
-  const youSection = `
+  // Both players are now selectable. Player 1 defaults to the signed-in user but
+  // can be changed, so a spectator can record a match between two other people.
+  // playerPicker(which) renders one slot's field + searchable dropdown, excluding
+  // whoever is already chosen in the other slot.
+  const playerPicker = (which) => {
+    const selId = which === 'a' ? state.logA : state.logB;
+    const otherId = which === 'a' ? state.logB : state.logA;
+    const selP = selId ? P(selId) : null;
+    const open = state.pickerOpen === which;
+    const q = (state.logSearch || '').trim();
+    const lc = q.toLowerCase();
+    const hasQuery = q.length > 0;
+    const fieldBorder = open ? '#006BD6' : (selP ? 'rgba(25,25,25,.1)' : 'rgba(25,25,25,.15)');
+    const searchBorder = hasQuery ? '#006BD6' : 'rgba(25,25,25,.12)';
+    const label = which === 'a' ? 'Player 1' : 'Player 2';
+    const placeholder = which === 'a' ? 'Select player 1' : 'Select player 2';
+    const youTag = selP && selId === state.identity
+      ? '<span style="font-size:10px;font-weight:900;letter-spacing:.5px;color:#006BD6;background:#E5F3FF;border-radius:999px;padding:2px 7px">YOU</span>' : '';
+
+    // recent opponents = distinct opponents from the signed-in user's history,
+    // most-recent first, cap 4 — a quick-pick list, minus the other chosen slot.
+    const seenOpp = new Set();
+    const recentIds = [];
+    state.myMatches.forEach(m => {
+      const oid = m.winner_id === state.identity ? m.loser_id
+        : (m.loser_id === state.identity ? m.winner_id : null);
+      if (oid && oid !== state.identity && !seenOpp.has(oid) && P(oid)) { seenOpp.add(oid); recentIds.push(oid); }
+    });
+    const topRecent = recentIds.filter(id => id !== otherId).slice(0, 4);
+    const gamesVs = oid => state.myMatches.filter(m =>
+      (m.winner_id === state.identity && m.loser_id === oid) ||
+      (m.loser_id === state.identity && m.winner_id === oid)).length;
+
+    const recent = topRecent.map(id => P(id));
+    const rest = state.players
+      .filter(o => o.id !== otherId && !topRecent.includes(o.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const results = hasQuery
+      ? state.players
+          .filter(o => o.id !== otherId && o.name.toLowerCase().includes(lc))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      : [];
+
+    const rowBase = 'width:100%;display:flex;align-items:center;gap:11px;border:none;border-bottom:1px solid rgba(25,25,25,.05);padding:10px 16px;text-align:left';
+    const rowAvatar = o => `<div style="width:34px;height:34px;border-radius:999px;background:${o.color};color:${o.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">${esc(o.initials)}</div>`;
+    const rowElo = o => `<span style="font-family:var(--font-mono);font-size:12px;color:rgba(25,25,25,.45)">${o.elo}</span>`;
+    const rowCheck = sel => sel ? '<i class="ph-fill ph-check-circle" style="font-size:19px;color:#008928"></i>' : '';
+    const rowOpen = o => `<button class="tap row" data-action="pick-player" data-which="${which}" data-id="${esc(o.id)}" style="${rowBase};background:${o.id === selId ? '#EAF4FF' : '#fff'}">`;
+
+    const recentRow = o => {
+      const n = gamesVs(o.id);
+      return `${rowOpen(o)}
+        ${rowAvatar(o)}
+        <div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:600;color:#191919">${esc(o.name)}</div><div style="font-size:11.5px;font-weight:400;color:rgba(25,25,25,.5)">${n} game${n === 1 ? '' : 's'} together</div></div>
+        ${rowElo(o)}${rowCheck(o.id === selId)}
+      </button>`;
+    };
+    const plainRow = o => `${rowOpen(o)}
+        ${rowAvatar(o)}
+        <span style="flex:1;font-size:14.5px;font-weight:500;color:#191919">${esc(o.name)}</span>
+        ${rowElo(o)}${rowCheck(o.id === selId)}
+      </button>`;
+    const resultRow = o => {
+      const i = o.name.toLowerCase().indexOf(lc);
+      return `${rowOpen(o)}
+        ${rowAvatar(o)}
+        <span style="flex:1;font-size:14.5px;font-weight:500;color:#191919">${esc(o.name.slice(0, i))}<span style="background:#FFF1A8;font-weight:700;border-radius:3px">${esc(o.name.slice(i, i + q.length))}</span>${esc(o.name.slice(i + q.length))}</span>
+        ${rowElo(o)}${rowCheck(o.id === selId)}
+      </button>`;
+    };
+
+    const recentHeader = `<div style="padding:11px 16px 5px;font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#006BD6;display:flex;align-items:center;gap:6px"><i class="ph-fill ph-clock-counter-clockwise" style="font-size:13px"></i>Recent opponents</div>`;
+    const allHeader = `<div style="padding:13px 16px 5px;font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.45)">All players</div>`;
+    const emptyState = `<div style="padding:30px 20px;text-align:center">
+        <div style="width:46px;height:46px;border-radius:13px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;margin:0 auto 11px"><i class="ph ph-user-focus" style="font-size:24px;color:rgba(25,25,25,.35)"></i></div>
+        <div style="font-size:14px;font-weight:700;color:#191919">No players match &ldquo;${esc(q)}&rdquo;</div>
+        <div style="font-size:12.5px;font-weight:300;color:rgba(25,25,25,.55);margin-top:3px">Check the spelling, or clear the search to see everyone.</div>
+      </div>`;
+
+    let panelBody;
+    if (hasQuery) {
+      panelBody = results.length ? results.map(resultRow).join('') : emptyState;
+    } else {
+      panelBody = (recent.length ? recentHeader + recent.map(recentRow).join('') : '')
+        + allHeader + rest.map(plainRow).join('');
+    }
+
+    return `
     <div>
-      <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin:0 0 6px 2px">You</div>
-      <div style="display:flex;align-items:center;gap:12px;background:#F5F5F5;border:1.5px solid rgba(25,25,25,.1);border-radius:14px;padding:12px 14px">
-        <div style="width:40px;height:40px;border-radius:999px;background:${meP.color};color:${meP.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${esc(meP.initials)}</div>
-        <span style="flex:1;font-size:16px;font-weight:700;color:#191919">${esc(meP.name)}</span>
-        <span style="display:flex;align-items:center;gap:5px;color:rgba(25,25,25,.45);font-size:12px;font-weight:700"><i class="ph-fill ph-lock-simple" style="font-size:14px"></i>You</span>
-      </div>
-    </div>`;
-
-  // Section B — searchable opponent picker
-  const oppP = state.logB ? P(state.logB) : null;
-  const open = state.pickerOpen === 'b';
-  const q = (state.logSearch || '').trim();
-  const lc = q.toLowerCase();
-  const hasQuery = q.length > 0;
-  const fieldBorder = open ? '#006BD6' : (oppP ? 'rgba(25,25,25,.1)' : 'rgba(25,25,25,.15)');
-  const searchBorder = hasQuery ? '#006BD6' : 'rgba(25,25,25,.12)';
-
-  // recent opponents = distinct opponents from my own history, most-recent first, cap 4
-  const seenOpp = new Set();
-  const recentIds = [];
-  state.myMatches.forEach(m => {
-    const oid = m.winner_id === state.identity ? m.loser_id
-      : (m.loser_id === state.identity ? m.winner_id : null);
-    if (oid && oid !== state.identity && !seenOpp.has(oid) && P(oid)) { seenOpp.add(oid); recentIds.push(oid); }
-  });
-  const topRecent = recentIds.slice(0, 4);
-  const gamesVs = oid => state.myMatches.filter(m =>
-    (m.winner_id === state.identity && m.loser_id === oid) ||
-    (m.loser_id === state.identity && m.winner_id === oid)).length;
-
-  const recent = topRecent.map(id => P(id));
-  const rest = state.players
-    .filter(o => o.id !== state.identity && !topRecent.includes(o.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const results = hasQuery
-    ? state.players
-        .filter(o => o.id !== state.identity && o.name.toLowerCase().includes(lc))
-        .sort((a, b) => a.name.localeCompare(b.name))
-    : [];
-
-  const rowBase = 'width:100%;display:flex;align-items:center;gap:11px;border:none;border-bottom:1px solid rgba(25,25,25,.05);padding:10px 16px;text-align:left';
-  const rowAvatar = o => `<div style="width:34px;height:34px;border-radius:999px;background:${o.color};color:${o.textColor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">${esc(o.initials)}</div>`;
-  const rowElo = o => `<span style="font-family:var(--font-mono);font-size:12px;color:rgba(25,25,25,.45)">${o.elo}</span>`;
-  const rowCheck = sel => sel ? '<i class="ph-fill ph-check-circle" style="font-size:19px;color:#008928"></i>' : '';
-  const rowOpen = o => `<button class="tap row" data-action="pick-player" data-which="b" data-id="${esc(o.id)}" style="${rowBase};background:${o.id === state.logB ? '#EAF4FF' : '#fff'}">`;
-
-  const recentRow = o => {
-    const n = gamesVs(o.id);
-    return `${rowOpen(o)}
-      ${rowAvatar(o)}
-      <div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:600;color:#191919">${esc(o.name)}</div><div style="font-size:11.5px;font-weight:400;color:rgba(25,25,25,.5)">${n} game${n === 1 ? '' : 's'} together</div></div>
-      ${rowElo(o)}${rowCheck(o.id === state.logB)}
-    </button>`;
-  };
-  const plainRow = o => `${rowOpen(o)}
-      ${rowAvatar(o)}
-      <span style="flex:1;font-size:14.5px;font-weight:500;color:#191919">${esc(o.name)}</span>
-      ${rowElo(o)}${rowCheck(o.id === state.logB)}
-    </button>`;
-  const resultRow = o => {
-    const i = o.name.toLowerCase().indexOf(lc);
-    return `${rowOpen(o)}
-      ${rowAvatar(o)}
-      <span style="flex:1;font-size:14.5px;font-weight:500;color:#191919">${esc(o.name.slice(0, i))}<span style="background:#FFF1A8;font-weight:700;border-radius:3px">${esc(o.name.slice(i, i + q.length))}</span>${esc(o.name.slice(i + q.length))}</span>
-      ${rowElo(o)}${rowCheck(o.id === state.logB)}
-    </button>`;
-  };
-
-  const recentHeader = `<div style="padding:11px 16px 5px;font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#006BD6;display:flex;align-items:center;gap:6px"><i class="ph-fill ph-clock-counter-clockwise" style="font-size:13px"></i>Recent opponents</div>`;
-  const allHeader = `<div style="padding:13px 16px 5px;font-size:10.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.45)">All players</div>`;
-  const emptyState = `<div style="padding:30px 20px;text-align:center">
-      <div style="width:46px;height:46px;border-radius:13px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;margin:0 auto 11px"><i class="ph ph-user-focus" style="font-size:24px;color:rgba(25,25,25,.35)"></i></div>
-      <div style="font-size:14px;font-weight:700;color:#191919">No players match &ldquo;${esc(q)}&rdquo;</div>
-      <div style="font-size:12.5px;font-weight:300;color:rgba(25,25,25,.55);margin-top:3px">Check the spelling, or clear the search to see everyone.</div>
-    </div>`;
-
-  let panelBody;
-  if (hasQuery) {
-    panelBody = results.length ? results.map(resultRow).join('') : emptyState;
-  } else {
-    panelBody = (recent.length ? recentHeader + recent.map(recentRow).join('') : '')
-      + allHeader + rest.map(plainRow).join('');
-  }
-
-  const opponentSection = `
-    <div>
-      <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin:0 0 6px 2px">Opponent</div>
-      <button class="tap" data-action="toggle-picker" data-which="b" style="width:100%;display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid ${fieldBorder};border-radius:14px;padding:12px 14px;text-align:left">
-        <div style="width:40px;height:40px;border-radius:999px;background:${oppP ? oppP.color : '#E5E5E5'};color:${oppP ? oppP.textColor : 'rgba(25,25,25,.4)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${oppP ? esc(oppP.initials) : '?'}</div>
-        <span style="flex:1;font-size:16px;font-weight:700;color:${oppP ? '#191919' : 'rgba(25,25,25,.4)'}">${oppP ? esc(oppP.name) : 'Select opponent'}</span>
+      <div style="display:flex;align-items:center;gap:8px;margin:0 0 6px 2px"><span style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5)">${label}</span>${youTag}</div>
+      <button class="tap" data-action="toggle-picker" data-which="${which}" style="width:100%;display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid ${fieldBorder};border-radius:14px;padding:12px 14px;text-align:left">
+        <div style="width:40px;height:40px;border-radius:999px;background:${selP ? selP.color : '#E5E5E5'};color:${selP ? selP.textColor : 'rgba(25,25,25,.4)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${selP ? esc(selP.initials) : '?'}</div>
+        <span style="flex:1;font-size:16px;font-weight:700;color:${selP ? '#191919' : 'rgba(25,25,25,.4)'}">${selP ? esc(selP.name) : placeholder}</span>
         <i class="ph-bold ph-caret-${open ? 'up' : 'down'}" style="font-size:16px;color:rgba(25,25,25,.4)"></i>
       </button>
       ${open ? `
@@ -526,6 +528,10 @@ function viewLog() {
         <div class="app-scroll" style="max-height:300px;overflow-y:auto">${panelBody}</div>
       </div>` : ''}
     </div>`;
+  };
+
+  const p1Section = playerPicker('a');
+  const p2Section = playerPicker('b');
 
   const scName = (id, fb) => id ? first(P(id).name) : fb;
   const scoreCard = (which, name, score, winning) => `
@@ -570,10 +576,35 @@ function viewLog() {
     </div>`;
   }
 
+  // Confirmation sheet — shown when the signed-in user is recording a match they
+  // aren't playing in (a spectator logging two other players).
+  const confirmModal = state.confirmLog && bothPicked && valid ? (() => {
+    const aWon = state.scoreA > state.scoreB;
+    const A = P(state.logA), B = P(state.logB);
+    const W = aWon ? A : B, L = aWon ? B : A;
+    const ws = aWon ? state.scoreA : state.scoreB, ls = aWon ? state.scoreB : state.scoreA;
+    return `
+    <div data-action="confirm-log-backdrop" style="position:fixed;inset:0;z-index:85;background:rgba(25,25,25,.42);display:flex;flex-direction:column;justify-content:flex-end;max-width:480px;margin:0 auto">
+      <div data-stop="1" style="background:#fff;border-radius:24px 24px 0 0;padding:10px 20px 26px;animation:toastIn .22s var(--ease)">
+        <div style="width:40px;height:4px;border-radius:999px;background:rgba(25,25,25,.15);margin:0 auto 16px"></div>
+        <div style="width:52px;height:52px;border-radius:14px;background:#FFF7E0;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="ph-fill ph-flag-checkered" style="color:#946A00;font-size:26px"></i></div>
+        <div style="text-align:center;font-size:18px;font-weight:700;color:#191919;margin-bottom:6px">Log this match?</div>
+        <p style="text-align:center;font-size:13px;line-height:19px;color:rgba(25,25,25,.6);font-weight:300;margin:0 0 16px">You're not playing in this one &mdash; you're recording it for two other players. Double-check the result before you log it.</p>
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;background:#F5F5F5;border-radius:14px;padding:14px;margin-bottom:18px">
+          <span style="font-size:15px;font-weight:700;color:#191919">${esc(first(W.name))}</span>
+          <span style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:#006BD6">${ws}&ndash;${ls}</span>
+          <span style="font-size:15px;font-weight:700;color:rgba(25,25,25,.6)">${esc(first(L.name))}</span>
+        </div>
+        <button class="tap" data-action="confirm-log" ${state.busy ? 'disabled' : ''} style="width:100%;height:52px;border:none;border-radius:999px;background:#006BD6;color:#fff;font-size:15px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-check-circle" style="font-size:19px"></i>${state.busy ? 'Recording…' : 'Yes, log it'}</button>
+        <button class="tap" data-action="cancel-log" style="width:100%;height:48px;border:1.5px solid rgba(25,25,25,.15);border-radius:999px;background:#fff;color:#191919;font-size:14px;font-weight:700">Back</button>
+      </div>
+    </div>`;
+  })() : '';
+
   return `
   <div style="padding:20px 16px 28px">
     ${header}
-    <div style="display:flex;flex-direction:column;gap:12px">${youSection}${opponentSection}</div>
+    <div style="display:flex;flex-direction:column;gap:12px">${p1Section}${p2Section}</div>
     <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(25,25,25,.5);margin:20px 0 8px 2px">Score</div>
     <div style="display:flex;gap:12px">
       ${scoreCard('a', scName(state.logA, 'Player 1'), state.scoreA, state.scoreA >= state.scoreB)}
@@ -581,6 +612,7 @@ function viewLog() {
     </div>
     ${preview}
     <button class="tap" data-action="submit-match" ${valid && !state.busy ? '' : 'disabled'} style="margin-top:18px;width:100%;height:54px;border:none;border-radius:999px;background:${valid && !state.busy ? '#006BD6' : 'rgba(25,25,25,.2)'};color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-check-circle" style="font-size:20px"></i>${state.busy ? 'Recording…' : 'Record match'}</button>
+    ${confirmModal}
   </div>`;
 }
 
@@ -1512,7 +1544,7 @@ const snapshot = () => ({ screen: state.screen, profileId: state.profileId, feed
 
 function anyOverlayOpen() {
   return state.avatarMenu || !!state.disputeFor || !!state.pickerOpen ||
-    !!state.openPicker || state.byPlayerRowOpen || !!state.seasonModal;
+    !!state.openPicker || state.byPlayerRowOpen || !!state.seasonModal || state.confirmLog;
 }
 function closeOverlays() {
   state.avatarMenu = false;
@@ -1521,6 +1553,7 @@ function closeOverlays() {
   state.openPicker = null;
   state.byPlayerRowOpen = false;
   state.seasonModal = null;
+  state.confirmLog = false;
 }
 function applyView(view) {
   closeOverlays();
@@ -1537,6 +1570,39 @@ function handleBack() {
   if (anyOverlayOpen()) { closeOverlays(); render(); return true; }
   if (navStack.length) { applyView(navStack.pop()); return true; }
   return false;
+}
+
+// Perform the actual match log. Shared by the direct "Record match" path and the
+// spectator confirmation ("Yes, log it"). The server re-derives entered_by from
+// the caller, so anyone verified may log — including a match they're not in.
+async function doSubmitMatch() {
+  const { logA, logB, scoreA, scoreB } = state;
+  if (!logA || !logB || logA === logB || !validScore(scoreA, scoreB) || state.busy || !canAct()) return;
+  const aWon = scoreA > scoreB;
+  state.busy = true; render();
+  try {
+    const result = await api.logMatch({
+      winnerId: aWon ? logA : logB,
+      loserId: aWon ? logB : logA,
+      winnerScore: aWon ? scoreA : scoreB,
+      loserScore: aWon ? scoreB : scoreA,
+      enteredBy: state.identity,
+    });
+    const wName = first(P(aWon ? logA : logB).name);
+    await refreshData();
+    navStack.push(snapshot());
+    state.screen = 'feed';
+    state.feedSeason = null;   // show the live feed where the new match just landed
+    state.pickerOpen = null;
+    state.logSearch = '';
+    state.confirmLog = false;
+    state.scoreA = 11; state.scoreB = 0;
+    state.logA = state.identity; state.logB = null;   // reset Player 1 back to you
+    showToast(`${wName} wins! +${result.elo_delta} ELO`);
+  } catch (err) {
+    showToast(err.message || 'Could not record match');
+    console.error(err);
+  } finally { state.busy = false; render(); }
 }
 
 // ---------- actions ----------
@@ -1640,8 +1706,10 @@ const actions = {
     render();
   },
   'pick-player': el => {
-    const { id } = el.dataset;
-    if (id !== state.logA) state.logB = id;   // can't pick yourself
+    const { id, which } = el.dataset;
+    // set the chosen slot; never let both slots be the same player
+    if (which === 'a') { if (id !== state.logB) state.logA = id; }
+    else { if (id !== state.logA) state.logB = id; }
     state.pickerOpen = null;
     state.logSearch = '';
     render();
@@ -1652,33 +1720,16 @@ const actions = {
     state[key] = Math.max(0, Math.min(21, state[key] + Number(el.dataset.d)));
     render();
   },
-  'submit-match': async () => {
+  'submit-match': () => {
     const { logA, logB, scoreA, scoreB } = state;
     if (!logA || !logB || logA === logB || !validScore(scoreA, scoreB) || state.busy || !canAct()) return;
-    const aWon = scoreA > scoreB;
-    state.busy = true; render();
-    try {
-      const result = await api.logMatch({
-        winnerId: aWon ? logA : logB,
-        loserId: aWon ? logB : logA,
-        winnerScore: aWon ? scoreA : scoreB,
-        loserScore: aWon ? scoreB : scoreA,
-        enteredBy: state.identity,
-      });
-      const wName = first(P(aWon ? logA : logB).name);
-      await refreshData();
-      navStack.push(snapshot());
-      state.screen = 'feed';
-      state.feedSeason = null;   // show the live feed where the new match just landed
-      state.pickerOpen = null;
-      state.logSearch = '';
-      state.scoreA = 11; state.scoreB = 0; state.logB = null;
-      showToast(`${wName} wins! +${result.elo_delta} ELO`);
-    } catch (err) {
-      showToast(err.message || 'Could not record match');
-      console.error(err);
-    } finally { state.busy = false; render(); }
+    // Recording a match you aren't playing in? Confirm first (spectator logging).
+    if (state.identity !== logA && state.identity !== logB) { state.confirmLog = true; render(); return; }
+    doSubmitMatch();
   },
+  'confirm-log': () => doSubmitMatch(),
+  'cancel-log': () => { state.confirmLog = false; render(); },
+  'confirm-log-backdrop': () => { state.confirmLog = false; render(); },
   // ---- feed season selector ----
   'set-feed-season': async el => {
     const id = el.dataset.id;
@@ -1919,7 +1970,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
   // clicks inside a menu/sheet card shouldn't fall through to the backdrop's close action
-  if (stop && (el.dataset.action === 'menu-backdrop' || el.dataset.action === 'dispute-backdrop' || el.dataset.action === 'season-backdrop')) return;
+  if (stop && (el.dataset.action === 'menu-backdrop' || el.dataset.action === 'dispute-backdrop' || el.dataset.action === 'season-backdrop' || el.dataset.action === 'confirm-log-backdrop')) return;
   const fn = actions[el.dataset.action];
   if (fn) fn(el);
 });
