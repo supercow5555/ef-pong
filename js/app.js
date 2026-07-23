@@ -349,15 +349,32 @@ function renderView() {
 
 // ---------- leaderboard ----------
 function viewLeaderboard() {
-  const sorted = state.players;
-  const hasPodium = sorted.length >= 3;
+  // Only players who've logged a match this season appear on the board. Everyone
+  // starts at 1000 with a 0-0 record; unplayed rows would just be dead weight, so
+  // they're filtered out and nudged to log their first match instead. state.players
+  // is already elo-desc, so `played` keeps that order.
+  const played = state.players.filter(p => games(p) > 0);
+  // rank within the board (index in state.players counts unplayed 1000s, so it can't
+  // be trusted here) — compute it against the played-only list.
+  const rankById = {};
+  played.forEach((p, i) => { rankById[p.id] = i + 1; });
+
+  // The signed-in viewer who hasn't played yet gets a single ghost preview showing
+  // where a fresh 1000 would slot in — nobody else's un-played row is shown.
+  const meP = me();
+  const iHaventPlayed = !!(meP && games(meP) === 0);
+  const ghostElo = 1000;
+  // would-be rank = (# played players above 1000) + 1.
+  const ghostRank = iHaventPlayed ? played.filter(p => p.elo > ghostElo).length + 1 : 0;
+
+  const hasPodium = played.length >= 3;
   const medals = [
     { bg: '#FAB005', text: '#191919', size: 56, font: 18 },
     { bg: '#C7CDD4', text: '#191919', size: 50, font: 16 },
     { bg: '#CD8B54', text: '#fff', size: 50, font: 16 },
   ];
   const podium = hasPodium ? [1, 0, 2].map(i => {
-    const p = sorted[i], m = medals[i];
+    const p = played[i], m = medals[i];
     return `
     <div class="tap" data-action="open-profile" data-id="${esc(p.id)}" style="flex:1;background:#fff;border:1px solid var(--hairline);border-radius:16px;padding:14px 8px 12px;text-align:center;position:relative;box-shadow:0 6px 18px -12px rgba(25,25,25,.4);cursor:pointer">
       <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:${m.bg};color:${m.text};font-size:12px;font-weight:900">${i + 1}</div>
@@ -367,8 +384,9 @@ function viewLeaderboard() {
     </div>`;
   }).join('') : '';
 
-  const rows = (hasPodium ? sorted.slice(3) : sorted).map(p => {
-    const mv = move(p), rank = rankOf(p.id), isMe = p.id === state.identity;
+  const listPlayed = hasPodium ? played.slice(3) : played;
+  const rows = listPlayed.map(p => {
+    const mv = move(p), rank = rankById[p.id], isMe = p.id === state.identity;
     return `
     <div class="tap" data-action="open-profile" data-id="${esc(p.id)}" style="display:flex;align-items:center;gap:12px;background:${isMe ? '#E5F3FF' : '#fff'};border:1px solid ${isMe ? 'rgba(0,107,214,.4)' : 'var(--hairline)'};border-radius:14px;padding:10px 12px;cursor:pointer">
       <div style="width:22px;text-align:center;font-weight:700;font-size:15px;color:${rank <= 3 ? '#006BD6' : 'rgba(25,25,25,.4)'};flex-shrink:0">${rank}</div>
@@ -384,7 +402,29 @@ function viewLeaderboard() {
       <div style="display:flex;align-items:center;gap:3px;color:${mv.color};flex-shrink:0"><i class="${mv.icon}" style="font-size:13px"></i><span style="font-size:12px;font-weight:700">${mv.text}</span></div>
       <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:#191919;width:44px;text-align:right;flex-shrink:0">${p.elo}</div>
     </div>`;
-  }).join('');
+  });
+
+  // A dashed "you'd land about here" placeholder, spliced into the list at the elo
+  // position a fresh 1000 would take. No hard rank (it's hypothetical) — a ~N hint
+  // and the dashed styling keep it clearly distinct from real, earned rows.
+  if (iHaventPlayed) {
+    const ghost = `
+    <div data-action="nav" data-screen="log" class="tap" style="display:flex;align-items:center;gap:12px;background:#F5FAFF;border:1.5px dashed rgba(0,107,214,.5);border-radius:14px;padding:10px 12px;cursor:pointer">
+      <div style="width:22px;text-align:center;font-weight:700;font-size:13px;color:rgba(0,107,214,.7);flex-shrink:0">~${ghostRank}</div>
+      ${avatar(meP, 38, 13)}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:15px;font-weight:700;color:#191919;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(meP.name)}</span>
+          <span style="font-size:10px;font-weight:900;color:#006BD6;background:#E5F3FF;padding:1px 6px;border-radius:999px;letter-spacing:.5px">YOU</span>
+        </div>
+        <div style="font-size:12px;color:rgba(0,107,214,.75);font-weight:400;margin-top:1px">Log a match to claim your spot</div>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:rgba(25,25,25,.4);width:44px;text-align:right;flex-shrink:0">${ghostElo}</div>
+    </div>`;
+    // position among the list rows: players above the ghost, minus the podium slots.
+    const insertAt = Math.max(0, Math.min(listPlayed.length, ghostRank - 1 - (hasPodium ? 3 : 0)));
+    rows.splice(insertAt, 0, ghost);
+  }
 
   return `
   <div style="padding:20px 16px 28px">
@@ -392,13 +432,22 @@ function viewLeaderboard() {
       <h1 style="font-size:28px;font-weight:700;color:#191919;margin:0;letter-spacing:-.5px">Leaderboard</h1>
       <span style="font-size:12px;font-weight:700;color:#006BD6;text-transform:uppercase;letter-spacing:.8px">${esc(state.season.name)}</span>
     </div>
-    <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">${state.players.length} players &middot; live ranking</p>
+    <p style="margin:0 0 18px;font-size:13px;color:rgba(25,25,25,.55);font-weight:300">${played.length} ${played.length === 1 ? 'player' : 'players'} on the board &middot; live ranking</p>
+    ${iHaventPlayed ? `
+    <div data-action="nav" data-screen="log" class="tap" style="display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:14px 16px;background:#E5F3FF;border:1px solid rgba(0,107,214,.35);border-radius:14px;cursor:pointer">
+      <div style="width:38px;height:38px;border-radius:10px;background:#006BD6;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ph-fill ph-ping-pong" style="color:#fff;font-size:20px"></i></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:700;color:#006BD6">Log a match to see yourself on the leaderboard</div>
+        <div style="font-size:12px;color:rgba(25,25,25,.6);font-weight:300;margin-top:1px">You're previewed below at 1000 ELO &mdash; your first result locks it in.</div>
+      </div>
+      <i class="ph-bold ph-caret-right" style="color:#006BD6;font-size:16px;flex-shrink:0"></i>
+    </div>` : ''}
     ${hasPodium ? `<div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:22px">${podium}</div>` : ''}
-    <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
-    ${!hasPodium ? `
+    <div style="display:flex;flex-direction:column;gap:8px">${rows.join('')}</div>
+    ${played.length === 0 && !iHaventPlayed ? `
     <div style="margin-top:14px;text-align:center;padding:18px;background:#E5F3FF;border:1px dashed rgba(0,107,214,.35);border-radius:14px">
-      <div style="font-size:13px;font-weight:700;color:#006BD6">Get the office on the board</div>
-      <div style="font-size:12px;color:rgba(25,25,25,.6);font-weight:300;margin-top:2px">Share the link &mdash; teammates sign in and claim their name.</div>
+      <div style="font-size:13px;font-weight:700;color:#006BD6">No matches logged yet</div>
+      <div style="font-size:12px;color:rgba(25,25,25,.6);font-weight:300;margin-top:2px">The board fills up as soon as the first game is recorded.</div>
     </div>` : ''}
   </div>`;
 }
