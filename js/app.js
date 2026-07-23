@@ -1235,7 +1235,7 @@ function renderGate() {
   };
   const gt = titles[step] || titles.email;
   const activeIdx = (step === 'email' || step === 'sent') ? 0 : 1;
-  const progress = ['Verify email', 'Claim name'].map((name, i) => `
+  const progress = ['Sign in', 'Claim name'].map((name, i) => `
     <div style="flex:1;display:flex;flex-direction:column;gap:6px">
       <div style="height:4px;border-radius:999px;background:${i <= activeIdx ? '#006BD6' : 'rgba(0,107,214,.15)'}"></div>
       <span style="font-size:10px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:${i <= activeIdx ? '#006BD6' : 'rgba(25,25,25,.35)'}">${name}</span>
@@ -1248,14 +1248,11 @@ function renderGate() {
       const m = PROVIDER_META[p] || { label: 'Continue with ' + p, icon: 'ph-sign-in', color: '#191919' };
       return `<button class="tap" data-action="oauth" data-provider="${p}" ${state.busy ? 'disabled' : ''} style="width:100%;height:52px;border:1.5px solid rgba(25,25,25,.15);background:#fff;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:10px;color:#191919;font-size:15px;font-weight:700"><i class="ph-bold ${m.icon}" style="font-size:20px;color:${m.color}"></i>${m.label}</button>`;
     }).join('');
-    const emailFallback = AUTH_PROVIDERS.includes('email') ? `
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0"><div style="flex:1;height:1px;background:rgba(25,25,25,.12)"></div><span style="font-size:11px;font-weight:700;color:rgba(25,25,25,.4);text-transform:uppercase;letter-spacing:.5px">or use email</span><div style="flex:1;height:1px;background:rgba(25,25,25,.12)"></div></div>
-      <div style="background:#fff;border:1.5px solid rgba(25,25,25,.12);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px">
-        <input id="auth-email" value="${esc(state.authEmail)}" type="email" placeholder="you@example.com" autocomplete="email" style="width:100%;height:48px;border:1.5px solid rgba(25,25,25,.15);border-radius:12px;padding:0 14px;font-size:16px;font-weight:500;color:#191919;outline:none" />
-        <button class="tap" data-action="send-link" ${emailOk && !state.busy ? '' : 'disabled'} style="width:100%;height:48px;border:none;border-radius:999px;background:${emailOk && !state.busy ? '#006BD6' : 'rgba(25,25,25,.2)'};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-bold ph-paper-plane-tilt" style="font-size:18px"></i>${state.busy ? 'Sending…' : 'Send magic link'}</button>
-        <p style="margin:0;font-size:11px;color:rgba(25,25,25,.45);font-weight:300;text-align:center">Magic-link email can be slow to arrive — the buttons above are faster.</p>
-      </div>` : '';
-    body = providerBtns + emailFallback;
+    const soon = `
+      <button disabled style="width:100%;height:52px;border:1.5px solid rgba(25,25,25,.1);background:#F5F5F5;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:10px;color:rgba(25,25,25,.4);font-size:15px;font-weight:700;cursor:not-allowed"><i class="ph-bold ph-windows-logo" style="font-size:20px"></i>Microsoft login — coming soon</button>`;
+    const tip = `
+      <div style="display:flex;align-items:flex-start;gap:8px;background:#E5F3FF;border:1px solid rgba(0,107,214,.2);border-radius:12px;padding:10px 12px;margin-top:4px"><i class="ph-fill ph-lightbulb" style="color:#006BD6;font-size:16px;flex-shrink:0;margin-top:1px"></i><span style="font-size:12px;line-height:17px;color:#191919;font-weight:300">Signed up with your EF email before? Sign in via Google and pick that account in the next step.</span></div>`;
+    body = providerBtns + soon + tip;
   } else if (step === 'sent') {
     body = `
     <div style="background:#fff;border:1.5px solid rgba(0,107,214,.25);border-radius:16px;padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
