@@ -127,15 +127,22 @@ function mkInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// elo 24h ago from the audit trail -> today's movement
+// elo as of cutoffMs from the audit trail -> today's movement.
+// A season roll resets everyone to 1000 but writes no rating_history row, so we must
+// never reach across the season boundary: rows from prior seasons are ignored and the
+// baseline is the 1000 reset. Otherwise a fresh roll shows every player as a huge
+// mover (e.g. last season's 850 -> this season's 1000 = a phantom +150).
 function eloAt(playerId, cutoffMs) {
-  let last = null;
+  const seasonStart = state.season ? new Date(state.season.starts_at).getTime() : 0;
+  let last = 1000;
   for (const h of state.history) {
     if (h.player_id !== playerId) continue;
-    if (new Date(h.recorded_at).getTime() > cutoffMs) break;
+    const t = new Date(h.recorded_at).getTime();
+    if (t < seasonStart) continue;   // prior season, pre-reset — irrelevant now
+    if (t > cutoffMs) break;
     last = h.rating_after;
   }
-  return last ?? 1000;
+  return last;
 }
 function move(p) {
   const prev = eloAt(p.id, Date.now() - 24 * 3600 * 1000);
