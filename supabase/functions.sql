@@ -45,15 +45,15 @@ declare
   v_l_new int;
   v_caller text;
 begin
-  -- Trust wave: match ownership. The caller must be a verified player (email
-  -- bound via magic link) AND one of the two players. The opponent may be any
-  -- roster player, verified or not. ELO math below is unchanged from the MVP.
+  -- The caller must be a verified player (email bound via magic link), but need
+  -- NOT be one of the two players: any verified player may record a match,
+  -- including a spectator logging a game between two other people. This removes
+  -- the earlier friction where only a participant could log. We still stamp
+  -- entered_by with the caller so there's an audit trail of who recorded it.
+  -- ELO math below is unchanged from the MVP.
   v_caller := current_player();
   if v_caller is null then
     raise exception 'sign in (and get verified) to log matches';
-  end if;
-  if v_caller <> p_winner_id and v_caller <> p_loser_id then
-    raise exception 'you can only log matches you played in';
   end if;
   p_entered_by := v_caller;
 
